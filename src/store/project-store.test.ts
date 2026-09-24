@@ -145,6 +145,14 @@ describe("I/O", () => {
     store.addNetInterface({ deviceId: "power", name: "IF3", protocol: "Modbus" });
     store.addNetInterface({ deviceId: "power", name: "IF3", protocol: "Modbus" });
     expect(store.importIoMap("power", [], [{ module: "CPU", name: "IF3", mappings: [] }])).toMatchObject({ interfaces: 1 });
+
+    const other = store.addNetInterface({ deviceId: "power", name: "IF4", protocol: "Modbus" });
+    const twoModules = [
+      { module: "CPU", name: "IF4", mappings: [] },
+      { module: "COM-2", name: "IF4", mappings: [] },
+    ];
+    expect(store.importIoMap("power", [], twoModules)).toMatchObject({ interfaces: 2 });
+    expect(useProjectStore.getState().project.netInterfaces[other].module).toBeUndefined();
   });
 
   it("keeps one mapping per variable when a symbol is read into two, across re-imports", () => {
@@ -162,6 +170,20 @@ describe("I/O", () => {
     const mappings = useProjectStore.getState().project.netMappings;
     expect(mappings[hmiId].variable).toBe("gHmi.Level");
     expect(mappings[logId].variable).toBe("gLog.TankLevel");
+  });
+
+  it("leaves same-symbol mappings alone when every variable changed, rather than guess", () => {
+    const store = useProjectStore.getState();
+    const toHmi = { name: "Level", symbol: "level", direction: "input" as const, variable: "gHmi.Level" };
+    const toLog = { name: "Level", symbol: "level", direction: "input" as const, variable: "gLog.Level" };
+    store.importIoMap("power", [], [{ module: "CPU", name: "IF2", mappings: [toHmi, toLog] }]);
+    const before = structuredClone(useProjectStore.getState().project.netMappings);
+
+    const renamed = [{ ...toLog, variable: "gLog.TankLevel" }, { ...toHmi, variable: "gHmi.TankLevel" }];
+    const again = store.importIoMap("power", [], [{ module: "CPU", name: "IF2", mappings: renamed }]);
+    expect(again).toMatchObject({ mappingsAdded: 2, mappingsUpdated: 0, unpaired: 2 });
+    const after = useProjectStore.getState().project.netMappings;
+    for (const id of Object.keys(before)) expect(after[id]).toEqual(before[id]);
   });
 
   it("keeps one signal per variable when a channel is read into two, across re-imports", () => {
