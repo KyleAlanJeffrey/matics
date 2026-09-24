@@ -349,7 +349,7 @@ function AddButtons({ owner }: { owner: string }) {
   const project = useProject();
   const navigate = useNavigate();
   const { addDocumentLink, linkDocument } = useProjectStore();
-  const attachFile = useAttachFile();
+  const { attach, attaching } = useAttachFile();
   const { open, setOpen, ref } = useDropdown();
   const [webLink, setWebLink] = useState(false);
   const [query, setQuery] = useState("");
@@ -379,11 +379,12 @@ function AddButtons({ owner }: { owner: string }) {
       <div className="flex flex-wrap gap-2">
         {isDesktop() && (
           <button
+            disabled={attaching}
             onClick={async () => {
-              const id = await attachFile(owner);
+              const id = await attach(owner);
               if (id) navigate(docHref(project, owner, id));
             }}
-            className={`${button} border-brand text-brand-ink hover:bg-brand-wash`}
+            className={`${button} border-brand text-brand-ink hover:bg-brand-wash disabled:opacity-50`}
             title="Copy a PDF or other file into the project folder"
           >
             <FileUp className="h-4 w-4" /> Attach PDF or file

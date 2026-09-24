@@ -83,16 +83,17 @@ function resolveTarget(project: Project, id: string): { owner: string; doc?: str
 // On a device or network page the file is linked there; anywhere else it is unfiled.
 function AttachFileButton({ owner }: { owner: string }) {
   const project = useProject();
-  const attachFile = useAttachFile();
+  const { attach, attaching } = useAttachFile();
   const navigate = useNavigate();
   return (
     <button
+      disabled={attaching}
       onClick={async () => {
         const linkTo = isOwner(project, owner) ? owner : null;
-        const id = await attachFile(linkTo);
+        const id = await attach(linkTo);
         if (id) navigate(docHref(project, linkTo ?? UNFILED, id));
       }}
-      className="flex shrink-0 items-center gap-1.5 rounded-md border border-slate-300 px-4 py-2 font-semibold text-slate-800 hover:bg-slate-50"
+      className="flex shrink-0 items-center gap-1.5 rounded-md border border-slate-300 px-4 py-2 font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50"
       title="Copy a PDF or other file into the project folder"
     >
       <FileUp className="h-4 w-4" /> Attach PDF or file
