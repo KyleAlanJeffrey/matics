@@ -127,9 +127,9 @@ pnpm install
 pnpm desktop:dev
 ```
 
-`pnpm desktop:build` writes installers to `src-tauri/target/release/bundle/`. Pushing a
-`v<version>` tag builds macOS, Windows and Linux installers in GitHub Actions and attaches
-them to a draft release (see [VERSIONING.md](VERSIONING.md)).
+`pnpm desktop:build` writes installers to `src-tauri/target/release/bundle/`. Every push
+to main builds macOS, Windows and Linux installers in GitHub Actions and publishes them as
+a new release (see [VERSIONING.md](VERSIONING.md)).
 
 Other scripts:
 

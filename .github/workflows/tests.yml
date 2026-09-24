@@ -1,4 +1,4 @@
-name: CI
+name: Tests
 
 on:
   pull_request:
@@ -9,11 +9,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: tests-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  frontend:
+  unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,10 +27,9 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-      - run: pnpm build
+      - run: pnpm test
 
-  desktop:
+  rust:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +51,7 @@ jobs:
         with:
           workspaces: src-tauri -> target
       - run: pnpm install --frozen-lockfile
-      # The Tauri context embeds dist/, so the frontend is built before the Rust compiles.
+      # The Tauri context embeds dist/, so the frontend is built before the Rust tests compile.
       - run: pnpm build
-      - run: cargo check --locked
+      - run: cargo test --locked
         working-directory: src-tauri
