@@ -2,19 +2,28 @@ import { useRef, useState } from "react";
 import { FileUp, Info } from "lucide-react";
 import { useProject, useProjectStore } from "@/store/project-store";
 import { ioMapModules, parseIoMap, type ImportedModule } from "@/model/io";
+import { ioMapInterfaces, type ImportedInterface } from "@/model/net";
 import type { Project } from "@/model/types";
 
 interface Pending {
   fileName: string;
   modules: ImportedModule[];
-  interfaceBindings: number;
+  interfaces: ImportedInterface[];
   skipped: number;
 }
 
+export interface IoMapImported {
+  deviceId: string;
+  moduleId?: string;
+  interfaceId?: string;
+}
+
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
 // The device a mapping most likely belongs to: one named after a module in the file
 // (the CPU usually is), else the controller in view.
-function guessController(project: Project, modules: ImportedModule[], fallback?: string) {
-  const names = modules.map((m) => m.name.toLowerCase());
+function guessController(project: Project, pending: Pick<Pending, "modules" | "interfaces">, fallback?: string) {
+  const names = [...pending.modules, ...pending.interfaces.map((i) => ({ name: i.module }))].map((m) => m.name.toLowerCase());
   const named = Object.values(project.devices).find((device) => {
     const model = project.presets[device.presetId]?.model.toLowerCase();
     return names.includes(device.name.toLowerCase()) || (!!model && names.includes(model));
@@ -22,7 +31,8 @@ function guessController(project: Project, modules: ImportedModule[], fallback?:
   return named?.id ?? (fallback && project.devices[fallback] ? fallback : Object.keys(project.devices)[0] ?? "");
 }
 
-export function IoImportButton({ defaultDeviceId, onImported }: { defaultDeviceId?: string; onImported: (moduleId: string) => void }) {
+// Reads a B&R IoMap.iom: channel bindings go to I/O and interface mappings to Communications.
+export function IoImportButton({ defaultDeviceId, onImported }: { defaultDeviceId?: string; onImported: (imported: IoMapImported) => void }) {
   const project = useProject();
   const importIoMap = useProjectStore((s) => s.importIoMap);
   const input = useRef<HTMLInputElement>(null);
@@ -34,13 +44,13 @@ export function IoImportButton({ defaultDeviceId, onImported }: { defaultDeviceI
     setNotice(null);
     try {
       const parsed = parseIoMap(await file.text());
-      const modules = ioMapModules(parsed);
-      if (modules.length === 0) {
-        setNotice(`${file.name}: no channel bindings found.`);
+      const found = { modules: ioMapModules(parsed), interfaces: ioMapInterfaces(parsed) };
+      if (found.modules.length === 0 && found.interfaces.length === 0) {
+        setNotice(`${file.name}: no bindings found.`);
         return;
       }
-      setPending({ fileName: file.name, modules, interfaceBindings: parsed.interfaceBindings, skipped: parsed.skipped.length });
-      setDeviceId(guessController(project, modules, defaultDeviceId));
+      setPending({ fileName: file.name, ...found, skipped: parsed.skipped.length });
+      setDeviceId(guessController(project, found, defaultDeviceId));
     } catch (error) {
       setNotice(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -48,20 +58,23 @@ export function IoImportButton({ defaultDeviceId, onImported }: { defaultDeviceI
 
   const confirm = () => {
     if (!pending || !deviceId) return;
-    const result = importIoMap(deviceId, pending.modules);
-    const extras = [
-      pending.interfaceBindings > 0 && `${pending.interfaceBindings} network interface mapping${pending.interfaceBindings === 1 ? " was" : "s were"} not imported`,
-      pending.skipped > 0 && `${pending.skipped} line${pending.skipped === 1 ? "" : "s"} could not be read`,
+    const result = importIoMap(deviceId, pending.modules, pending.interfaces);
+    const parts = [
+      pending.modules.length > 0 && `${plural(result.added, "signal")} added${result.updated ? `, ${result.updated} updated` : ""}${result.modules ? ` (${plural(result.modules, "new module")})` : ""}`,
+      pending.interfaces.length > 0 &&
+        `${plural(result.mappingsAdded, "network mapping")} added${result.mappingsUpdated ? `, ${result.mappingsUpdated} updated` : ""}${result.interfaces ? ` (${plural(result.interfaces, "new interface")})` : ""}`,
+      pending.skipped > 0 && `${plural(pending.skipped, "line")} could not be read`,
     ].filter(Boolean);
-    setNotice(
-      `${pending.fileName}: ${result.added} signal${result.added === 1 ? "" : "s"} added${result.updated ? `, ${result.updated} updated` : ""}${result.modules ? `, ${result.modules} new module${result.modules === 1 ? "" : "s"}` : ""}.${extras.length ? ` ${extras.join("; ")}.` : ""}`,
-    );
-    const first = Object.values(useProjectStore.getState().project.ioModules).find((m) => m.deviceId === deviceId && m.name === pending.modules[0].name);
+    setNotice(`${pending.fileName}: ${parts.join("; ")}.`);
+    const { ioModules, netInterfaces } = useProjectStore.getState().project;
+    const firstModule = pending.modules[0] && Object.values(ioModules).find((m) => m.deviceId === deviceId && m.name === pending.modules[0].name);
+    const firstInterface = pending.interfaces[0] && Object.values(netInterfaces).find((i) => i.deviceId === deviceId && i.module === pending.interfaces[0].module && i.name === pending.interfaces[0].name);
     setPending(null);
-    if (first) onImported(first.id);
+    onImported({ deviceId, moduleId: firstModule?.id, interfaceId: firstInterface?.id });
   };
 
   const signalCount = pending?.modules.reduce((n, m) => n + m.signals.length, 0) ?? 0;
+  const mappingCount = pending?.interfaces.reduce((n, i) => n + i.mappings.length, 0) ?? 0;
 
   return (
     <div className="relative">
@@ -83,7 +96,10 @@ export function IoImportButton({ defaultDeviceId, onImported }: { defaultDeviceI
         <div className="absolute right-0 top-full z-40 mt-1 flex w-96 flex-col gap-2 rounded-md border border-slate-200 bg-white p-3 text-slate-700 shadow-lg">
           <div className="font-semibold text-slate-900">Import {pending.fileName}</div>
           <div className="text-[12px] text-slate-500">
-            {signalCount} bindings on {pending.modules.length} module{pending.modules.length === 1 ? "" : "s"}. Existing channels get the new binding and keep their field device, pin and notes.
+            {[signalCount > 0 && `${plural(signalCount, "channel binding")} on ${plural(pending.modules.length, "module")}`, mappingCount > 0 && `${plural(mappingCount, "network mapping")} on ${plural(pending.interfaces.length, "interface")}`]
+              .filter(Boolean)
+              .join(" and ")}
+            . Existing channels and mappings get the new binding and keep what you documented.
           </div>
           <label className="flex flex-col gap-1">
             <span className="text-[11px] font-medium text-slate-500">Controller</span>

@@ -113,11 +113,38 @@ describe("I/O", () => {
         ],
       },
       { name: "DI-16", signals: [] },
-    ]);
-    expect(result).toEqual({ modules: 1, added: 1, updated: 1 });
+    ], []);
+    expect(result).toMatchObject({ modules: 1, added: 1, updated: 1 });
     const project = useProjectStore.getState().project;
     expect(project.ioSignals["signal-io-local-digitaloutput01"]).toMatchObject({ name: "Front light bar", task: "Cyclic#2", fieldDeviceId: "front-lights", pin: "X2.1" });
     expect(Object.values(project.ioSignals).find((s) => s.name === "HornOn")?.moduleId).toBe("io-local");
+  });
+
+  it("re-imports interface mappings by symbol and keeps their names and registers", () => {
+    const store = useProjectStore.getState();
+    const heartbeat = { name: "Heartbeat", symbol: "heartbeat", direction: "output" as const, variable: "gNet.Heartbeat", task: "Cyclic#1" };
+    const first = store.importIoMap("power", [], [{ module: "CPU", name: "IF2", mappings: [heartbeat] }]);
+    expect(first).toMatchObject({ interfaces: 1, mappingsAdded: 1, mappingsUpdated: 0 });
+    const project = useProjectStore.getState().project;
+    const netInterface = Object.values(project.netInterfaces).find((i) => i.module === "CPU")!;
+    const mapping = Object.values(project.netMappings).find((m) => m.interfaceId === netInterface.id)!;
+    store.updateNetMapping(mapping.id, { name: "Heartbeat to HMI", register: "40001" });
+
+    const again = store.importIoMap("power", [], [{ module: "CPU", name: "IF2", mappings: [{ ...heartbeat, task: "Cyclic#2" }] }]);
+    expect(again).toMatchObject({ interfaces: 0, mappingsAdded: 0, mappingsUpdated: 1 });
+    expect(useProjectStore.getState().project.netMappings[mapping.id]).toMatchObject({ name: "Heartbeat to HMI", register: "40001", task: "Cyclic#2" });
+  });
+
+  it("removes an interface with its mappings and their notes", () => {
+    const store = useProjectStore.getState();
+    const interfaceId = store.addNetInterface({ deviceId: "power", name: "IF1", protocol: "Modbus" });
+    const mappingId = store.addNetMapping({ interfaceId, name: "Level", symbol: "level", direction: "input" });
+    store.setNote(mappingId, "Read every second.");
+    store.removeNetInterface(interfaceId);
+    const project = useProjectStore.getState().project;
+    expect(project.netInterfaces[interfaceId]).toBeUndefined();
+    expect(project.netMappings[mappingId]).toBeUndefined();
+    expect(project.notes[mappingId]).toBeUndefined();
   });
 
   it("drops a removed controller's modules and unwires signals from a removed field device", () => {

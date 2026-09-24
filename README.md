@@ -39,9 +39,11 @@ changes, the documentation changes with it.
 - **I/O.** The controller's hardware channels and the signals bound to them, read from a
   B&R `IoMap.iom` file or mapped by hand. Record the field device, connector pin and
   electrical range of each channel, and review what is still missing.
-- **Communications.** CAN frame allocations (read from DBC files or entered by hand) and
+- **Communications.** CAN frame allocations (read from DBC files or entered by hand),
   Protobuf messages imported from `.proto` files, each with its sender, receivers and
-  transport.
+  transport, and Modbus mappings: the PLC variables a controller exchanges over each
+  fieldbus interface, read from the same `IoMap.iom`. Filter the combined list by type or
+  device.
 - **Sketches.** A built-in whiteboard for rough ideas, with shapes that link to the
   devices they describe.
 - **Report.** A printable summary of the whole system (schematic, parts list, networks,

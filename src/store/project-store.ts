@@ -17,6 +17,8 @@ import {
   type FreeWire,
   type IoModule,
   type IoSignal,
+  type NetInterface,
+  type NetMapping,
   type Note,
   type NoteContent,
   type PortRef,
@@ -31,6 +33,7 @@ import {
 } from "@/model/types";
 import { sampleProject } from "@/model/sample-project";
 import type { ImportedModule } from "@/model/io";
+import type { ImportedInterface } from "@/model/net";
 import { resolveWikiTarget } from "@/model/derived";
 import { renameWikiLinks } from "@/model/markdown";
 import { busGeometry, DEFAULT_BUS_LENGTH } from "@/views/diagram/to-flow";
@@ -104,6 +107,15 @@ function emptyProject(name: string, library: Library): Project {
     netMappings: {},
     routes: {},
   };
+}
+
+export interface IoMapImportResult {
+  modules: number;
+  added: number;
+  updated: number;
+  interfaces: number;
+  mappingsAdded: number;
+  mappingsUpdated: number;
 }
 
 interface ProjectState {
@@ -199,8 +211,16 @@ interface ProjectState {
   removeIoSignal: (signalId: string) => void;
   // A parsed I/O mapping for one controller, in one undo step. Modules match by name and
   // signals by channel; a match gets the new binding and keeps its field device, pin,
-  // range and notes.
-  importIoMap: (deviceId: string, modules: ImportedModule[]) => { modules: number; added: number; updated: number };
+  // range and notes. Interfaces match by module and name and their mappings by symbol; a
+  // match keeps its name, register, peer and notes.
+  importIoMap: (deviceId: string, modules: ImportedModule[], interfaces: ImportedInterface[]) => IoMapImportResult;
+  addNetInterface: (netInterface: Omit<NetInterface, "id">) => string;
+  updateNetInterface: (interfaceId: string, patch: Partial<Omit<NetInterface, "id">>) => void;
+  // Removes the interface's mappings with it.
+  removeNetInterface: (interfaceId: string) => void;
+  addNetMapping: (mapping: Omit<NetMapping, "id">) => string;
+  updateNetMapping: (mappingId: string, patch: Partial<Omit<NetMapping, "id">>) => void;
+  removeNetMapping: (mappingId: string) => void;
 
   // Sketches sit outside the project undo history entirely (see keepSketches).
   addSketch: (name: string) => string;
@@ -332,11 +352,18 @@ function forgetIoDevice(project: Project, deviceId: string) {
   for (const signal of Object.values(project.ioSignals)) if (signal.fieldDeviceId === deviceId) delete signal.fieldDeviceId;
   for (const netInterface of Object.values(project.netInterfaces)) {
     if (netInterface.peerDeviceId === deviceId) delete netInterface.peerDeviceId;
-    if (netInterface.deviceId !== deviceId) continue;
-    for (const mapping of Object.values(project.netMappings)) if (mapping.interfaceId === netInterface.id) delete project.netMappings[mapping.id];
-    delete project.netInterfaces[netInterface.id];
-    forgetEntity(project, netInterface.id);
+    if (netInterface.deviceId === deviceId) dropNetInterface(project, netInterface.id);
   }
+}
+
+function dropNetInterface(project: Project, interfaceId: string) {
+  for (const mapping of Object.values(project.netMappings)) {
+    if (mapping.interfaceId !== interfaceId) continue;
+    delete project.netMappings[mapping.id];
+    forgetEntity(project, mapping.id);
+  }
+  delete project.netInterfaces[interfaceId];
+  forgetEntity(project, interfaceId);
 }
 
 // Inside a set() the project is an immer draft; this runs a set that undo will not record.
@@ -922,8 +949,8 @@ export const useProjectStore = create<ProjectState>()(
           forgetEntity(state.project, signalId);
         }),
 
-      importIoMap: (deviceId, modules) => {
-        const result = { modules: 0, added: 0, updated: 0 };
+      importIoMap: (deviceId, modules, interfaces) => {
+        const result: IoMapImportResult = { modules: 0, added: 0, updated: 0, interfaces: 0, mappingsAdded: 0, mappingsUpdated: 0 };
         set((state) => {
           const project = state.project;
           for (const imported of modules) {
@@ -948,9 +975,68 @@ export const useProjectStore = create<ProjectState>()(
               }
             }
           }
+          for (const imported of interfaces) {
+            let netInterface = Object.values(project.netInterfaces).find((i) => i.deviceId === deviceId && i.module === imported.module && i.name === imported.name);
+            if (!netInterface) {
+              const id = newId("netif");
+              netInterface = project.netInterfaces[id] = { id, deviceId, module: imported.module, name: imported.name, protocol: "Modbus" };
+              result.interfaces++;
+            }
+            const existing = Object.values(project.netMappings).filter((m) => m.interfaceId === netInterface.id);
+            for (const mapping of imported.mappings) {
+              const match = existing.find((m) => m.symbol === mapping.symbol);
+              if (match) {
+                Object.assign(match, { direction: mapping.direction, variable: mapping.variable, task: mapping.task });
+                result.mappingsUpdated++;
+              } else {
+                const id = newId("netmap");
+                project.netMappings[id] = { id, interfaceId: netInterface.id, ...mapping };
+                result.mappingsAdded++;
+              }
+            }
+          }
         });
         return result;
       },
+
+      addNetInterface: (netInterface) => {
+        const id = newId("netif");
+        set((state) => {
+          state.project.netInterfaces[id] = { id, ...netInterface };
+        });
+        return id;
+      },
+
+      updateNetInterface: (interfaceId, patch) =>
+        set((state) => {
+          const netInterface = state.project.netInterfaces[interfaceId];
+          if (netInterface) Object.assign(netInterface, patch);
+        }),
+
+      removeNetInterface: (interfaceId) =>
+        set((state) => {
+          dropNetInterface(state.project, interfaceId);
+        }),
+
+      addNetMapping: (mapping) => {
+        const id = newId("netmap");
+        set((state) => {
+          state.project.netMappings[id] = { id, ...mapping };
+        });
+        return id;
+      },
+
+      updateNetMapping: (mappingId, patch) =>
+        set((state) => {
+          const mapping = state.project.netMappings[mappingId];
+          if (mapping) Object.assign(mapping, patch);
+        }),
+
+      removeNetMapping: (mappingId) =>
+        set((state) => {
+          delete state.project.netMappings[mappingId];
+          forgetEntity(state.project, mappingId);
+        }),
 
       addSketch: (name) => {
         const id = newId("sketch");

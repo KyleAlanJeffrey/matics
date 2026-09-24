@@ -69,7 +69,7 @@ export function IoView() {
             <h1 className="text-[24px] font-bold leading-tight text-slate-900">I/O</h1>
             <div className="mt-0.5 text-slate-500">Hardware channels and field-signal bindings</div>
           </div>
-          <IoImportButton defaultDeviceId={scope?.deviceId} onImported={(moduleId) => setScope({ deviceId: project.ioModules[moduleId]?.deviceId ?? "", moduleId })} />
+          <IoImportButton defaultDeviceId={scope?.deviceId} onImported={({ deviceId, moduleId }) => moduleId && setScope({ deviceId, moduleId })} />
           <button
             onClick={() => {
               select(null);
@@ -177,7 +177,7 @@ function HardwareTree({ project, scope, onScope }: { project: Project; scope: Sc
           );
         })}
       </div>
-      <Link to="/communications" className="flex items-center gap-2 border-t border-slate-200 px-4 py-3 text-slate-600 hover:bg-slate-50">
+      <Link to="/communications?tab=modbus" className="flex items-center gap-2 border-t border-slate-200 px-4 py-3 text-slate-600 hover:bg-slate-50">
         <Network className="h-4 w-4 text-slate-500" />
         <span className="flex-1">
           <span className="block font-medium text-slate-800">Network interfaces</span>

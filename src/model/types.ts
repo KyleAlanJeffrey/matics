@@ -344,8 +344,11 @@ export interface IoSignal {
 export interface NetInterface {
   id: string;
   deviceId: string;
+  // The hardware module the interface is on, as the controller names it.
+  module?: string;
   name: string;
   protocol: string;
+  // The device on the other end, when known.
   peerDeviceId?: string;
   transport?: string;
   unitId?: string;

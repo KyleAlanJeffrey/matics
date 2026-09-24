@@ -1,4 +1,5 @@
 import { formatFrameRange, partyLabel } from "./frames";
+import { mappingEnds } from "./net";
 import { formatEndpoint } from "./services";
 import type { MessageEndpoint, Project, ProtoField, ProtoMessage } from "./types";
 
@@ -60,15 +61,26 @@ export function messagesByDevice(project: Project): DeviceMessages[] {
   return Object.keys(project.devices).flatMap((id) => byDevice.get(id) ?? []);
 }
 
-// One row of the combined communications list: a CAN frame definition or a Protobuf message.
+// One row of the combined communications list: a CAN frame definition, a Protobuf message
+// or a fieldbus mapping.
 export interface CommunicationRow {
-  kind: "can" | "protobuf";
+  kind: "can" | "protobuf" | "modbus";
   id: string;
   name: string;
   meta?: string;
   from?: string;
   to: string[];
   transport?: string;
+  // Every placed device at either end, for filtering by device.
+  deviceIds: string[];
+}
+
+// A CAN party is a device, or a product standing for all of its copies.
+function partyDeviceIds(project: Project, partyId: string): string[] {
+  if (project.devices[partyId]) return [partyId];
+  return Object.values(project.devices)
+    .filter((d) => d.presetId === partyId)
+    .map((d) => d.id);
 }
 
 export function communicationRows(project: Project): CommunicationRow[] {
@@ -85,6 +97,7 @@ export function communicationRows(project: Project): CommunicationRow[] {
         .filter(Boolean)
         .map((bus) => `CAN ${bus.tag ?? bus.name}`)
         .join(", ") || undefined,
+    deviceIds: [frame.senderId, ...frame.receiverIds].filter(Boolean).flatMap((id) => partyDeviceIds(project, id)),
   }));
   const messages: CommunicationRow[] = Object.values(project.messages).map((message) => ({
     kind: "protobuf",
@@ -94,6 +107,24 @@ export function communicationRows(project: Project): CommunicationRow[] {
     from: endpointLabel(project, message.sender),
     to: message.receivers.map((r) => endpointLabel(project, r)).filter((label): label is string => !!label),
     transport: message.transport,
+    deviceIds: [message.sender, ...message.receivers].flatMap((end) => (end && project.devices[end.deviceId] ? [end.deviceId] : [])),
   }));
-  return [...frames, ...messages];
+  const mappings: CommunicationRow[] = Object.values(project.netMappings).flatMap((mapping) => {
+    const netInterface = project.netInterfaces[mapping.interfaceId];
+    if (!netInterface) return [];
+    const ends = mappingEnds(project, netInterface, mapping.direction);
+    return [
+      {
+        kind: "modbus" as const,
+        id: mapping.id,
+        name: mapping.name,
+        meta: mapping.symbol,
+        from: ends.from,
+        to: ends.to ? [ends.to] : [],
+        transport: netInterface.name,
+        deviceIds: [netInterface.deviceId, netInterface.peerDeviceId].filter((id): id is string => !!id && !!project.devices[id]),
+      },
+    ];
+  });
+  return [...frames, ...messages, ...mappings];
 }

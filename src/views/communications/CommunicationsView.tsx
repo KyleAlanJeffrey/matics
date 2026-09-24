@@ -1,28 +1,41 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router";
-import { FileCode2, Network, Plus } from "lucide-react";
+import { Database, FileCode2, Network, Plus, Search } from "lucide-react";
 import { useProject, useProjectStore } from "@/store/project-store";
 import { useSelection } from "@/lib/selection";
 import { communicationRows, type CommunicationRow } from "@/model/messages";
 import { FramesView } from "@/views/frames/FramesView";
+import { IoImportButton } from "@/views/io/IoImportButton";
 import { ProtobufView } from "./ProtobufView";
+import { ModbusView, resolveInterface } from "./ModbusView";
 import { MessageTable } from "./MessageTable";
 import { ProtoImportButton } from "./ProtoImportButton";
 
-const TABS = ["all", "can", "protobuf"] as const;
+const TABS = ["all", "can", "protobuf", "modbus"] as const;
 type Tab = (typeof TABS)[number];
+type Kind = CommunicationRow["kind"];
 
-// Messages exchanged between devices and services. CAN frame definitions and Protobuf
-// messages each keep their own fields; "All" lists both side by side.
+const KIND_LABELS: Record<Kind, string> = { can: "CAN", protobuf: "Protobuf", modbus: "Modbus" };
+
+function KindIcon({ kind }: { kind: Kind }) {
+  if (kind === "can") return <Network className="h-4 w-4 shrink-0 text-[#713bc4]" />;
+  if (kind === "protobuf") return <FileCode2 className="h-4 w-4 shrink-0 text-brand-ink" />;
+  return <Database className="h-4 w-4 shrink-0 text-emerald-600" />;
+}
+
+// Messages exchanged between devices and services. CAN frame definitions, Protobuf
+// messages and fieldbus mappings each keep their own fields; "All" lists them together.
 export function CommunicationsView() {
   const project = useProject();
   const [params, setParams] = useSearchParams();
   const tabParam = params.get("tab") as Tab | null;
   const tab: Tab = tabParam && TABS.includes(tabParam) ? tabParam : "all";
-  const { select } = useSelection();
-  const { addMessage, addFrame } = useProjectStore();
+  const { selectedId, select } = useSelection();
+  const { addMessage, addFrame, addNetMapping } = useProjectStore();
   const frameCount = Object.keys(project.frames).length;
   const messageCount = Object.keys(project.messages).length;
+  const mappingCount = Object.keys(project.netMappings).length;
+  const currentInterface = tab === "modbus" ? resolveInterface(project, params.get("interface"), selectedId) : undefined;
 
   const setTab = (next: Tab, selected?: string) =>
     setParams(
@@ -41,6 +54,10 @@ export function CommunicationsView() {
       select(addFrame({}));
       return;
     }
+    if (tab === "modbus") {
+      if (currentInterface) select(addNetMapping({ interfaceId: currentInterface.id, name: "New mapping", symbol: "", direction: "output" }));
+      return;
+    }
     setTab("protobuf", addMessage());
   };
 
@@ -52,9 +69,32 @@ export function CommunicationsView() {
             <h1 className="text-[24px] font-bold leading-tight text-slate-900">Communications</h1>
             <div className="mt-0.5 text-slate-500">Messages exchanged between devices and services</div>
           </div>
-          <ProtoImportButton onImported={() => setTab("protobuf")} />
-          <button onClick={add} className="flex items-center gap-1.5 rounded-md bg-brand px-3.5 py-2 font-semibold text-charcoal hover:bg-brand-hover">
-            <Plus className="h-4 w-4" /> {tab === "can" ? "Add frame" : "Add message"}
+          {tab === "modbus" ? (
+            <IoImportButton
+              defaultDeviceId={currentInterface?.deviceId}
+              onImported={({ interfaceId }) =>
+                interfaceId &&
+                setParams(
+                  (prev) => {
+                    const next = new URLSearchParams(prev);
+                    next.set("interface", interfaceId);
+                    next.delete("selected");
+                    return next;
+                  },
+                  { replace: true },
+                )
+              }
+            />
+          ) : (
+            <ProtoImportButton onImported={() => setTab("protobuf")} />
+          )}
+          <button
+            onClick={add}
+            disabled={tab === "modbus" && !currentInterface}
+            title={tab === "modbus" && !currentInterface ? "Add an interface first" : undefined}
+            className="flex items-center gap-1.5 rounded-md bg-brand px-3.5 py-2 font-semibold text-charcoal hover:bg-brand-hover disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4" /> {tab === "can" ? "Add frame" : tab === "modbus" ? "Add mapping" : "Add message"}
           </button>
         </div>
         <div className="mt-3 flex gap-1">
@@ -67,11 +107,15 @@ export function CommunicationsView() {
           <TabButton active={tab === "protobuf"} onClick={() => setTab("protobuf")} icon={<FileCode2 className="h-4 w-4 text-brand-ink" />}>
             Protobuf {"\u00b7"} {messageCount}
           </TabButton>
+          <TabButton active={tab === "modbus"} onClick={() => setTab("modbus")} icon={<Database className="h-4 w-4 text-emerald-600" />}>
+            Modbus {"\u00b7"} {mappingCount}
+          </TabButton>
         </div>
       </div>
       <div className="min-h-0 flex-1">
         {tab === "can" && <FramesView embedded />}
         {tab === "protobuf" && <ProtobufView />}
+        {tab === "modbus" && <ModbusView />}
         {tab === "all" && <AllCommunications onOpen={(row) => setTab(row.kind, row.id)} />}
       </div>
     </div>
@@ -93,31 +137,88 @@ function TabButton({ active, onClick, icon, children }: { active: boolean; onCli
 function AllCommunications({ onOpen }: { onOpen: (row: CommunicationRow) => void }) {
   const project = useProject();
   const [query, setQuery] = useState("");
+  const [kind, setKind] = useState<Kind | "all">("all");
+  const [deviceId, setDeviceId] = useState("");
+  const all = communicationRows(project);
   const needle = query.trim().toLowerCase();
-  const rows = communicationRows(project).filter(
-    (row) => !needle || [row.name, row.meta, row.from, ...row.to, row.transport].some((text) => text?.toLowerCase().includes(needle)),
+  const rows = all.filter(
+    (row) =>
+      (kind === "all" || row.kind === kind) &&
+      (!deviceId || row.deviceIds.includes(deviceId)) &&
+      (!needle || [row.name, row.meta, row.from, ...row.to, row.transport].some((text) => text?.toLowerCase().includes(needle))),
   );
+  const counts = (Object.keys(KIND_LABELS) as Kind[]).map((k) => `${all.filter((row) => row.kind === k).length} ${KIND_LABELS[k]}`);
+  const onRows = new Set(all.flatMap((row) => row.deviceIds));
+  const devices = Object.values(project.devices).filter((d) => onRows.has(d.id));
+  const filtered = !!needle || kind !== "all" || !!deviceId;
 
   return (
     <div className="h-full overflow-y-auto bg-slate-50/60 p-6">
-      <input className="input mb-3 max-w-md" placeholder="Search messages, devices or transports..." value={query} onChange={(e) => setQuery(e.target.value)} />
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <div className="relative w-full max-w-md">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <input className="input !pl-8" aria-label="Search messages" placeholder="Search messages, devices or transports..." value={query} onChange={(e) => setQuery(e.target.value)} />
+        </div>
+        <label className="flex items-center gap-2 text-slate-600">
+          Type
+          <select className="input !w-auto" value={kind} onChange={(e) => setKind(e.target.value as Kind | "all")}>
+            <option value="all">All</option>
+            {(Object.keys(KIND_LABELS) as Kind[]).map((k) => (
+              <option key={k} value={k}>
+                {KIND_LABELS[k]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-2 text-slate-600">
+          Device
+          <select className="input !w-auto" value={deviceId} onChange={(e) => setDeviceId(e.target.value)}>
+            <option value="">All</option>
+            {devices.map((device) => (
+              <option key={device.id} value={device.id}>
+                {device.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="mb-2 text-[12px] text-slate-500">
+        {all.length} definition{all.length === 1 ? "" : "s"}: {counts.join(", ")}
+      </div>
       <MessageTable
         rows={rows.map((row) => ({
           key: `${row.kind}:${row.id}`,
-          icon: row.kind === "can" ? <Network className="h-4 w-4 text-[#713bc4]" /> : <FileCode2 className="h-4 w-4 text-brand-ink" />,
+          icon: <KindIcon kind={row.kind} />,
           name: row.name,
           meta: row.meta,
-          badge: row.kind === "can" ? "CAN" : "Protobuf",
+          badge: KIND_LABELS[row.kind],
           from: row.from,
           to: row.to,
           transport: row.transport,
           onClick: () => onOpen(row),
         }))}
-        empty="No CAN frames or Protobuf messages yet."
+        empty={
+          filtered ? (
+            <button
+              onClick={() => {
+                setQuery("");
+                setKind("all");
+                setDeviceId("");
+              }}
+              className="text-brand-ink hover:underline"
+            >
+              Clear filters
+            </button>
+          ) : (
+            "No CAN frames, Protobuf messages or network mappings yet."
+          )
+        }
       />
-      <div className="mt-2 text-[12px] text-slate-500">
-        {rows.length} message{rows.length === 1 ? "" : "s"}
-      </div>
+      {filtered && (
+        <div className="mt-2 text-[12px] text-slate-500">
+          {rows.length} of {all.length} shown
+        </div>
+      )}
     </div>
   );
 }
