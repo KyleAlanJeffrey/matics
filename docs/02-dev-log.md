@@ -117,7 +117,8 @@ the stack decision in `00-tech-stack.md`.
   `assets/`. `dragDropEnabled` is off in tauri.conf.json so HTML file drops reach the page.
 - Navigation: two-finger scroll pans, pinch or Cmd/Ctrl + wheel zooms.
 - The inspector is read-only until Edit is pressed; removal buttons appear only while
-  editing. The same rule holds for every inspector in the app.
+  editing. The Communications editors (CAN frames and Protobuf messages) are the
+  exception: every property there is edited in place.
 
 ## Documentation
 
@@ -142,7 +143,9 @@ the stack decision in `00-tech-stack.md`.
   comments. Nodes are matched to devices by name (`matchNode`) in an import dialog.
 - Protobuf messages come from `.proto` files (`src/model/proto.ts`) and get a sender and
   receivers (device plus service), a transport (suggested from the sender service's port),
-  fields, documents and a note.
+  fields, documents and a note. One select picks a device or one of its services;
+  receivers are removable chips, as on a CAN frame. A field's type box takes
+  `repeated <type>` as in the schema.
 
 ## Sketches
 

@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
-import { FileCode2, FileText, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, FileCode2, FileText, Plus, Trash2, X } from "lucide-react";
 import { useProject, useProjectStore } from "@/store/project-store";
 import { useSelection } from "@/lib/selection";
 import { DocumentLinks } from "@/components/DocumentLinks";
@@ -117,12 +117,13 @@ const SECTIONS = [
   { id: "documentation", label: "Documentation" },
 ] as const;
 
+// Every property is edited in place, like a CAN frame's.
 function MessageInspector({ message, onClose }: { message: ProtoMessage; onClose: () => void }) {
   const project = useProject();
   const { updateMessage, removeMessage } = useProjectStore();
-  const [editing, setEditing] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const suggestion = suggestedTransport(project, message);
+  const senderService = endpointService(project, message.sender);
 
   const jump = (id: string) => {
     const target = scroller.current?.querySelector<HTMLElement>(`[data-section="${id}"]`);
@@ -133,19 +134,9 @@ function MessageInspector({ message, onClose }: { message: ProtoMessage; onClose
     <aside className="flex w-[380px] shrink-0 flex-col border-l border-slate-200 bg-white">
       <div className="flex items-start gap-2 px-4 pt-3">
         <div className="min-w-0 flex-1">
-          {editing ? (
-            <input className="input font-semibold" aria-label="Message name" value={message.name} onChange={(e) => updateMessage(message.id, { name: e.target.value })} />
-          ) : (
-            <h2 className="truncate text-[20px] font-bold text-slate-900">{message.name}</h2>
-          )}
+          <h2 className="truncate text-[20px] font-bold text-slate-900">{message.name || "Untitled message"}</h2>
           <div className="mt-0.5 text-slate-500">Protobuf message</div>
         </div>
-        <button
-          onClick={() => setEditing((e) => !e)}
-          className={`flex items-center gap-1 rounded-md border px-2 py-1 ${editing ? "border-brand bg-brand-wash text-brand-ink" : "border-slate-300 text-slate-700 hover:bg-slate-50"}`}
-        >
-          <Pencil className="h-3.5 w-3.5" /> {editing ? "Done" : "Edit"}
-        </button>
         <button onClick={onClose} className="rounded p-1 text-slate-500 hover:bg-slate-100" title="Close">
           <X className="h-4 w-4" />
         </button>
@@ -160,110 +151,128 @@ function MessageInspector({ message, onClose }: { message: ProtoMessage; onClose
 
       <div ref={scroller} className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-4">
         <section data-section="definition" className="flex flex-col gap-3">
-          <div>
-            <Label>Schema source</Label>
-            {editing ? (
-              <div className="flex gap-2">
-                <input className="input font-mono" aria-label="Schema file" placeholder="drive_control.proto" value={message.schemaFile ?? ""} onChange={(e) => updateMessage(message.id, { schemaFile: e.target.value || undefined })} />
-                <input className="input w-20 font-mono" aria-label="Schema version" placeholder="v1" value={message.version ?? ""} onChange={(e) => updateMessage(message.id, { version: e.target.value || undefined })} />
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <div className="flex-1 truncate rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 font-mono">{message.schemaFile ?? <span className="text-slate-400">Not set</span>}</div>
-                {message.version && <div className="rounded-md border border-slate-200 px-2.5 py-1.5 font-mono">{message.version}</div>}
-              </div>
-            )}
-          </div>
-          <div>
-            <Label>Fields</Label>
-            <FieldsTable message={message} editing={editing} />
-          </div>
+          <Field label="Name">
+            <input className="input" value={message.name} onChange={(e) => updateMessage(message.id, { name: e.target.value })} />
+          </Field>
+          <Field label="Schema source" group>
+            <div className="flex gap-2">
+              <input className="input font-mono" aria-label="Schema file" placeholder="drive_control.proto" value={message.schemaFile ?? ""} onChange={(e) => updateMessage(message.id, { schemaFile: e.target.value || undefined })} />
+              <input className="input w-20 font-mono" aria-label="Schema version" placeholder="v1" value={message.version ?? ""} onChange={(e) => updateMessage(message.id, { version: e.target.value || undefined })} />
+            </div>
+          </Field>
+          <Field label="Fields" group>
+            <FieldsTable message={message} />
+          </Field>
         </section>
 
         <section data-section="routing" className="flex flex-col gap-3 border-t border-slate-200 pt-4">
           <h3 className="text-[15px] font-semibold text-slate-900">Routing</h3>
-          <EndpointRow label="Sender" project={project} end={message.sender} editing={editing} onChange={(sender) => updateMessage(message.id, { sender })} />
-          {(message.receivers.length ? message.receivers : [undefined]).map((receiver, index) => (
-            <EndpointRow
-              key={index}
-              label={index === 0 ? "Receiver" : ""}
-              name={`Receiver ${index + 1}`}
-              project={project}
-              end={receiver}
-              editing={editing}
-              onChange={(next) => {
-                const receivers = [...message.receivers];
-                if (next) receivers[index] = next;
-                else receivers.splice(index, 1);
-                updateMessage(message.id, { receivers });
-              }}
-            />
-          ))}
-          {editing && message.receivers.length > 0 && (
-            <button
-              onClick={() => updateMessage(message.id, { receivers: [...message.receivers, { deviceId: Object.keys(project.devices)[0] }] })}
-              className="ml-[88px] flex items-center gap-1 self-start text-brand-ink hover:underline"
-            >
-              <Plus className="h-3.5 w-3.5" /> Another receiver
-            </button>
-          )}
-          <div className="grid grid-cols-[80px_1fr] items-center gap-2">
-            <span className="text-slate-500">Transport</span>
-            {editing ? (
-              <input
-                className="input"
-                aria-label="Transport"
-                placeholder={suggestion ?? "ZMQ, WebSocket, UDP broadcast..."}
-                value={message.transport ?? ""}
-                onChange={(e) => updateMessage(message.id, { transport: e.target.value || undefined })}
-              />
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className={`flex-1 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 ${message.transport ? "" : "text-slate-400"}`}>{message.transport ?? "Not set"}</span>
-                {!message.transport && suggestion && (
-                  <button onClick={() => updateMessage(message.id, { transport: suggestion })} className="shrink-0 text-brand-ink hover:underline" title="Use the sender service's port">
-                    Use {suggestion}
-                  </button>
-                )}
+          <Field label="Sender" icon={<ArrowUpFromLine className="h-3.5 w-3.5 text-brand-ink" />}>
+            <EndpointSelect project={project} value={message.sender} placeholder="Not set" onChange={(sender) => updateMessage(message.id, { sender })} />
+            {senderService && (
+              <Link to={`/notes/${senderService.id}`} className="self-start text-[12px] text-brand-ink hover:underline">
+                {senderService.name} notes
+              </Link>
+            )}
+          </Field>
+          <Field label="Receivers" icon={<ArrowDownToLine className="h-3.5 w-3.5 text-teal-600" />} group>
+            {message.receivers.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {message.receivers.map((receiver, index) => (
+                  <EndpointChip
+                    // Imported messages can list the same receiver twice.
+                    key={`${index}:${endpointKey(receiver)}`}
+                    project={project}
+                    end={receiver}
+                    onRemove={() => updateMessage(message.id, { receivers: message.receivers.filter((_, i) => i !== index) })}
+                  />
+                ))}
               </div>
             )}
-          </div>
+            <EndpointSelect
+              project={project}
+              placeholder="+ Add receiver"
+              label="Add receiver"
+              exclude={message.receivers}
+              className="text-slate-500"
+              onChange={(receiver) => receiver && updateMessage(message.id, { receivers: [...message.receivers, receiver] })}
+            />
+          </Field>
+          <Field label="Transport">
+            <input
+              className="input"
+              placeholder={suggestion ?? "ZMQ, WebSocket, UDP broadcast..."}
+              value={message.transport ?? ""}
+              onChange={(e) => updateMessage(message.id, { transport: e.target.value || undefined })}
+            />
+          </Field>
+          {!message.transport && suggestion && (
+            <button onClick={() => updateMessage(message.id, { transport: suggestion })} className="-mt-1 self-start text-brand-ink hover:underline" title="Use the sender service's port">
+              Use {suggestion}
+            </button>
+          )}
           <div className="text-[12px] text-slate-500">The message format and its transport are set separately.</div>
         </section>
 
         <section data-section="documentation" className="flex flex-col gap-3 border-t border-slate-200 pt-4">
           <h3 className="text-[15px] font-semibold text-slate-900">Documentation</h3>
-          <DocumentLinks entityId={message.id} compact readOnly={!editing} />
+          <DocumentLinks entityId={message.id} compact />
           <div className="rounded-md border border-slate-200 px-3 py-2">
             <NoteEditor entityId={message.id} />
           </div>
         </section>
 
-        {editing && (
-          <button
-            onClick={() => {
-              if (!window.confirm(`Remove ${message.name}? Its notes and document links go with it.`)) return;
-              removeMessage(message.id);
-              onClose();
-            }}
-            className="flex items-center gap-1 self-start text-red-700 hover:underline"
-          >
-            <Trash2 className="h-3.5 w-3.5" /> Remove message
-          </button>
-        )}
+        <button
+          onClick={() => {
+            if (!window.confirm(`Remove ${message.name || "this message"}? Its notes and document links go with it.`)) return;
+            removeMessage(message.id);
+            onClose();
+          }}
+          className="flex items-center justify-center gap-1 rounded border border-red-200 px-2 py-1.5 text-red-600 hover:bg-red-50"
+        >
+          <Trash2 className="h-3.5 w-3.5" /> Remove message
+        </button>
       </div>
     </aside>
   );
 }
 
-function Label({ children }: { children: React.ReactNode }) {
-  return <div className="mb-1 text-[12px] font-medium text-slate-500">{children}</div>;
+// A label around a group of controls would click the first of them (a remove button) when
+// its text is clicked, so groups get a plain heading instead.
+function Field({ label, icon, group = false, children }: { label: string; icon?: React.ReactNode; group?: boolean; children: React.ReactNode }) {
+  const heading = (
+    <span className="flex items-center gap-1 text-[12px] font-medium text-slate-500">
+      {icon} {label}
+    </span>
+  );
+  if (group) {
+    return (
+      <div role="group" aria-label={label} className="flex min-w-0 flex-col gap-1">
+        {heading}
+        {children}
+      </div>
+    );
+  }
+  return (
+    <label className="flex min-w-0 flex-col gap-1">
+      {heading}
+      {children}
+    </label>
+  );
 }
 
-function FieldsTable({ message, editing }: { message: ProtoMessage; editing: boolean }) {
+// "repeated" is typed in front of the type, as in the schema.
+const REPEATED = "repeated ";
+
+function parseFieldType(text: string): Pick<ProtoField, "type" | "repeated"> {
+  return text.startsWith(REPEATED) ? { type: text.slice(REPEATED.length), repeated: true } : { type: text, repeated: undefined };
+}
+
+function FieldsTable({ message }: { message: ProtoMessage }) {
   const updateMessage = useProjectStore((s) => s.updateMessage);
   const setField = (index: number, patch: Partial<ProtoField>) =>
     updateMessage(message.id, { fields: message.fields.map((field, i) => (i === index ? { ...field, ...patch } : field)) });
+  const cell = "input !border-transparent !bg-transparent !px-1 font-mono hover:!border-slate-200 focus:!border-[var(--color-accent)]";
 
   return (
     <div className="overflow-hidden rounded-md border border-slate-200">
@@ -275,96 +284,88 @@ function FieldsTable({ message, editing }: { message: ProtoMessage; editing: boo
       </div>
       {message.fields.length === 0 && <div className="px-3 py-2 text-slate-400">No fields.</div>}
       {message.fields.map((field, index) => (
-        <div key={index} className="grid grid-cols-[48px_1fr_1fr_24px] items-center gap-1 border-t border-slate-100 px-3 py-1.5 font-mono text-[12px]">
-          {editing ? (
-            <>
-              <input className="input !px-1 font-mono" aria-label={`Field ${index + 1} tag`} inputMode="numeric" value={field.tag} onChange={(e) => setField(index, { tag: Number(e.target.value.replace(/\D/g, "")) || 0 })} />
-              <input className="input !px-1 font-mono" aria-label={`Field ${index + 1} name`} value={field.name} onChange={(e) => setField(index, { name: e.target.value })} />
-              <input className="input !px-1 font-mono" aria-label={`Field ${index + 1} type`} value={field.type} onChange={(e) => setField(index, { type: e.target.value })} />
-              <button onClick={() => updateMessage(message.id, { fields: message.fields.filter((_, i) => i !== index) })} className="text-slate-400 hover:text-red-700" title="Remove field">
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </>
-          ) : (
-            <>
-              <span className="text-slate-500">{field.tag}</span>
-              <span className="truncate text-slate-900">{field.name}</span>
-              <span className="truncate text-slate-700">{fieldTypeLabel(field)}</span>
-              <span />
-            </>
-          )}
+        <div key={index} className="grid grid-cols-[48px_1fr_1fr_24px] items-center gap-1 border-t border-slate-100 px-3 py-1 font-mono text-[12px]">
+          <input className={`${cell} text-slate-500`} aria-label={`Field ${index + 1} tag`} inputMode="numeric" value={field.tag} onChange={(e) => setField(index, { tag: Number(e.target.value.replace(/\D/g, "")) || 0 })} />
+          <input className={`${cell} text-slate-900`} aria-label={`Field ${index + 1} name`} value={field.name} onChange={(e) => setField(index, { name: e.target.value })} />
+          <input className={`${cell} text-slate-700`} aria-label={`Field ${index + 1} type`} value={fieldTypeLabel(field)} onChange={(e) => setField(index, parseFieldType(e.target.value))} />
+          <button onClick={() => updateMessage(message.id, { fields: message.fields.filter((_, i) => i !== index) })} className="text-slate-400 hover:text-red-700" title="Remove field">
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
       ))}
-      {editing && (
-        <button
-          onClick={() => updateMessage(message.id, { fields: [...message.fields, { tag: Math.max(0, ...message.fields.map((f) => f.tag)) + 1, name: "field", type: "string" }] })}
-          className="flex w-full items-center gap-1 border-t border-slate-100 px-3 py-1.5 text-brand-ink hover:bg-slate-50"
-        >
-          <Plus className="h-3.5 w-3.5" /> Field
-        </button>
-      )}
+      <button
+        onClick={() => updateMessage(message.id, { fields: [...message.fields, { tag: Math.max(0, ...message.fields.map((f) => f.tag)) + 1, name: "field", type: "string" }] })}
+        className="flex w-full items-center gap-1 border-t border-slate-100 px-3 py-1.5 text-brand-ink hover:bg-slate-50"
+      >
+        <Plus className="h-3.5 w-3.5" /> Field
+      </button>
     </div>
   );
 }
 
-function EndpointRow({
-  label,
-  name = label,
+function endpointKey(end: MessageEndpoint) {
+  return JSON.stringify([end.deviceId, end.serviceId ?? null]);
+}
+
+function parseEndpointKey(key: string): MessageEndpoint {
+  const [deviceId, serviceId] = JSON.parse(key) as [string, string | null];
+  return serviceId ? { deviceId, serviceId } : { deviceId };
+}
+
+// A device, or one of its services, in one select. Ends listed in `exclude` are left out.
+function EndpointSelect({
   project,
-  end,
-  editing,
+  value,
+  placeholder,
+  label,
+  exclude = [],
+  className = "",
   onChange,
 }: {
-  label: string;
-  // Accessible name for the selects, for rows whose visible label is blank.
-  name?: string;
   project: Project;
-  end: MessageEndpoint | undefined;
-  editing: boolean;
+  value?: MessageEndpoint;
+  placeholder: string;
+  label?: string;
+  exclude?: MessageEndpoint[];
+  className?: string;
   onChange: (end: MessageEndpoint | undefined) => void;
 }) {
+  const taken = new Set(exclude.map(endpointKey));
+  const option = (end: MessageEndpoint, text: string) =>
+    taken.has(endpointKey(end)) ? null : (
+      <option key={endpointKey(end)} value={endpointKey(end)}>
+        {text}
+      </option>
+    );
+  const device = endpointDevice(project, value);
+  const known = !!device && (!value?.serviceId || !!endpointService(project, value));
+
+  return (
+    <select className={`input ${className}`} aria-label={label} value={value ? endpointKey(value) : ""} onChange={(e) => onChange(e.target.value ? parseEndpointKey(e.target.value) : undefined)}>
+      <option value="">{placeholder}</option>
+      {value && !known && <option value={endpointKey(value)}>{device ? `${device.name} / missing service` : "Unknown device"}</option>}
+      {Object.values(project.devices).flatMap((d) => [
+        option({ deviceId: d.id }, d.name),
+        ...(d.services ?? []).map((service) => option({ deviceId: d.id, serviceId: service.id }, `${d.name} / ${service.name}`)),
+      ])}
+    </select>
+  );
+}
+
+function EndpointChip({ project, end, onRemove }: { project: Project; end: MessageEndpoint; onRemove: () => void }) {
   const device = endpointDevice(project, end);
   const service = endpointService(project, end);
   return (
-    <div className="grid grid-cols-[80px_1fr] items-start gap-2">
-      <span className="pt-1.5 text-slate-500">{label}</span>
-      {editing ? (
-        <div className="flex flex-col gap-1">
-          <select className="input" aria-label={`${name} device`} value={end?.deviceId ?? ""} onChange={(e) => onChange(e.target.value ? { deviceId: e.target.value } : undefined)}>
-            <option value="">Not set</option>
-            {Object.values(project.devices).map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-          {device && (device.services?.length ?? 0) > 0 && (
-            <select className="input" aria-label={`${name} service`} value={end?.serviceId ?? ""} onChange={(e) => onChange({ deviceId: device.id, serviceId: e.target.value || undefined })}>
-              <option value="">Any service</option>
-              {device.services!.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-      ) : (
-        <div>
-          <div className={`rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 ${device ? "" : "text-slate-400"}`}>{device?.name ?? "Not set"}</div>
-          {device && (
-            <div className="mt-0.5 text-[12px] text-slate-500">
-              {service ? (
-                <Link to={`/notes/${service.id}`} className="text-brand-ink hover:underline">
-                  {service.name}
-                </Link>
-              ) : (
-                "Service not assigned"
-              )}
-            </div>
-          )}
-        </div>
+    <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 py-0.5 pl-2 pr-0.5">
+      <span className={`truncate ${device ? "text-slate-800" : "text-slate-400"}`}>{device?.name ?? "Unknown device"}</span>
+      {service && (
+        <Link to={`/notes/${service.id}`} className="truncate text-[12px] text-brand-ink hover:underline">
+          {service.name}
+        </Link>
       )}
-    </div>
+      <button onClick={onRemove} className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-red-600" title="Remove receiver">
+        <X className="h-3 w-3" />
+      </button>
+    </span>
   );
 }
