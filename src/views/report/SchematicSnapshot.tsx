@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { ReactFlow, ReactFlowProvider, ConnectionMode, useReactFlow, useStore } from "@xyflow/react";
+import { ReactFlow, ReactFlowProvider, ConnectionMode, useReactFlow } from "@xyflow/react";
 import type { Project } from "@/model/types";
 import { projectToFlow, DEVICE_CARD_WIDTH } from "@/views/diagram/to-flow";
 import { DeviceNode } from "@/views/diagram/DeviceNode";
@@ -9,6 +9,7 @@ import { ImageNode } from "@/views/diagram/ImageNode";
 import { WireEdge } from "@/views/diagram/WireEdge";
 import { FreeWireLayer } from "@/views/diagram/FreeWireLayer";
 import { BundleLayer } from "@/views/diagram/BundleLayer";
+import { useNodesMeasured } from "@/views/diagram/nodes-measured";
 
 const nodeTypes = { device: DeviceNode, bus: BusNode, zone: ZoneNode, image: ImageNode };
 const edgeTypes = { wire: WireEdge };
@@ -77,11 +78,9 @@ export function SchematicSnapshot({ project, width, onReady }: { project: Projec
   );
 }
 
-// The fitView prop frames whatever is measured first, which can leave cards out. Framing
-// again once every node has a size, then giving the wires a moment to draw, fixes that.
-// (useNodesInitialized also waits for handle bounds, which zones never get.)
+// Framing again once every node has a size, then giving the wires a moment to draw.
 function FitWhenMeasured({ onReady }: { onReady: () => void }) {
-  const initialized = useStore((s) => s.nodeLookup.size > 0 && Array.from(s.nodeLookup.values()).every((node) => !!node.measured.width && !!node.measured.height));
+  const initialized = useNodesMeasured();
   const { fitView } = useReactFlow();
   const fired = useRef(false);
   useEffect(() => {
