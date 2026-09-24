@@ -63,7 +63,7 @@ export function IoImportButton({ defaultDeviceId, onImported }: { defaultDeviceI
       pending.modules.length > 0 && `${plural(result.added, "signal")} added${result.updated ? `, ${result.updated} updated` : ""}${result.modules ? ` (${plural(result.modules, "new module")})` : ""}`,
       pending.interfaces.length > 0 &&
         `${plural(result.mappingsAdded, "network mapping")} added${result.mappingsUpdated ? `, ${result.mappingsUpdated} updated` : ""}${result.interfaces ? ` (${plural(result.interfaces, "new interface")})` : ""}`,
-      result.unpaired > 0 && `${plural(result.unpaired, "earlier binding")} left as it was, because its variable changed along with another on the same channel; check which to keep`,
+      result.unpaired > 0 && `${plural(result.unpaired, "earlier binding")} left as it was, because its variable changed along with another on the same channel or symbol; check which to keep`,
       pending.skipped > 0 && `${plural(pending.skipped, "line")} could not be read`,
     ].filter(Boolean);
     setNotice(`${pending.fileName}: ${parts.join("; ")}.`);
