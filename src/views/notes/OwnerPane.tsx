@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { ArrowUpRight, ChevronRight, FileUp, Globe, Info, Plus, Share2 } from "lucide-react";
+import { ArrowUpRight, ChevronRight, FileUp, Globe, Info, Link2, Plus, Share2 } from "lucide-react";
 import { useProject, useProjectDir, useProjectStore } from "@/store/project-store";
 import { assetSrc } from "@/lib/assets";
 import { isDesktop } from "@/lib/desktop";
@@ -21,7 +21,7 @@ import {
 import { formatFrameRange, partyLabel } from "@/model/frames";
 import { CATEGORY_LABELS, PORT_COLORS, PORT_KIND_LABELS, busColor, isBusRef, type CanFrame, type DeviceInstance, type DocumentKind, type Project } from "@/model/types";
 import { Tag } from "@/components/Badges";
-import { AddLinkForm } from "@/components/DocumentLinks";
+import { AddLinkForm, useAttachFile } from "@/components/DocumentLinks";
 import { useDropdown } from "@/components/Menu";
 import { EndpointBadge, ServiceForm, serviceIcon } from "@/components/Services";
 import { servicesOfPreset } from "@/model/services";
@@ -348,7 +348,8 @@ function DocumentList({ entries, owner, current, empty }: { entries: DocEntry[];
 function AddButtons({ owner }: { owner: string }) {
   const project = useProject();
   const navigate = useNavigate();
-  const { addDocumentLink, linkDocument, pickAsset } = useProjectStore();
+  const { addDocumentLink, linkDocument } = useProjectStore();
+  const attachFile = useAttachFile();
   const { open, setOpen, ref } = useDropdown();
   const [webLink, setWebLink] = useState(false);
   const [query, setQuery] = useState("");
@@ -356,19 +357,6 @@ function AddButtons({ owner }: { owner: string }) {
   const candidates = Object.values(project.documents)
     .filter((d) => !linked.has(d.id) && d.title.toLowerCase().includes(query.trim().toLowerCase()))
     .sort((a, b) => a.title.localeCompare(b.title));
-
-  const attachFile = async () => {
-    setOpen(false);
-    try {
-      const picked = await pickAsset("document");
-      if (!picked) return;
-      const ext = picked.name.split(".").pop()?.toLowerCase() ?? "";
-      const id = addDocumentLink(owner, { title: picked.name.replace(/\.[^.]+$/, ""), file: picked.rel, kind: ext === "pdf" ? "pdf" : "note" });
-      navigate(docHref(project, owner, id));
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Could not copy that file into the project.");
-    }
-  };
 
   if (webLink) {
     return (
@@ -385,11 +373,38 @@ function AddButtons({ owner }: { owner: string }) {
     );
   }
 
+  const button = "flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-medium";
   return (
-    <div className="mt-3 flex gap-2">
+    <div className="mt-3 flex flex-col items-start gap-2">
+      <div className="flex flex-wrap gap-2">
+        {isDesktop() && (
+          <button
+            onClick={async () => {
+              const id = await attachFile(owner);
+              if (id) navigate(docHref(project, owner, id));
+            }}
+            className={`${button} border-brand text-brand-ink hover:bg-brand-wash`}
+            title="Copy a PDF or other file into the project folder"
+          >
+            <FileUp className="h-4 w-4" /> Attach PDF or file
+          </button>
+        )}
+        <button onClick={() => setWebLink(true)} className={`${button} border-slate-300 text-slate-800 hover:bg-slate-50`} title="Link a datasheet or web page">
+          <Globe className="h-4 w-4" /> Web link
+        </button>
+        <button
+          onClick={() => {
+            const id = addDocumentLink(owner, { title: "Untitled note", kind: "note" });
+            navigate(docHref(project, owner, id));
+          }}
+          className={`${button} border-slate-300 text-slate-800 hover:bg-slate-50`}
+        >
+          <Plus className="h-4 w-4" /> Write a note
+        </button>
+      </div>
       <div ref={ref} className="relative">
-        <button onClick={() => setOpen(!open)} className="flex items-center gap-1.5 rounded-md border border-brand px-3 py-1.5 font-medium text-brand-ink hover:bg-brand-wash">
-          <Plus className="h-4 w-4" /> Link existing document
+        <button onClick={() => setOpen(!open)} className="flex items-center gap-1 text-[13px] text-brand-ink hover:underline">
+          <Link2 className="h-3.5 w-3.5" /> Link a document already in the project
         </button>
         {open && (
           <div className="absolute left-0 top-full z-30 mt-1 w-80 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
@@ -415,34 +430,9 @@ function AddButtons({ owner }: { owner: string }) {
                 );
               })}
             </div>
-            <div className="mt-1 border-t border-slate-200 pt-1">
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  setWebLink(true);
-                }}
-                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-slate-50"
-              >
-                <Globe className="h-4 w-4 text-slate-500" /> Web link or datasheet URL...
-              </button>
-              {isDesktop() && (
-                <button onClick={() => void attachFile()} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-slate-50">
-                  <FileUp className="h-4 w-4 text-slate-500" /> Attach a file...
-                </button>
-              )}
-            </div>
           </div>
         )}
       </div>
-      <button
-        onClick={() => {
-          const id = addDocumentLink(owner, { title: "Untitled note", kind: "note" });
-          navigate(docHref(project, owner, id));
-        }}
-        className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 font-medium text-slate-800 hover:bg-slate-50"
-      >
-        <Plus className="h-4 w-4" /> Write a note
-      </button>
     </div>
   );
 }

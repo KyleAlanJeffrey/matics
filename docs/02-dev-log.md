@@ -130,6 +130,9 @@ the stack decision in `00-tech-stack.md`.
 - PDFs render with pdf.js (`components/PdfViewer.tsx`). Attached files are read through
   `read_asset_base64`; web-linked PDFs are downloaded by the `fetch_pdf` command because
   most sites refuse cross-origin requests.
+- "Attach PDF or file" sits in the Documentation header on every page and under a device's
+  or network's document list (`useAttachFile`). It copies the file into `assets/` and
+  links it to the page's device or network, or leaves it unfiled on the other lists.
 - Devices carry services (software on each placed copy, with an optional TCP or UDP port).
   Each service has its own documentation page.
 

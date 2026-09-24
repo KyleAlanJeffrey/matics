@@ -21,25 +21,32 @@ export function DocumentBadge({ kind, size = "md" }: { kind: DocumentKind; size?
   return <span className={`flex ${dims} shrink-0 items-center justify-center rounded font-bold tracking-wide ${badge.className}`}>{badge.text}</span>;
 }
 
+// Copies a picked file into the project as a document linked to owner, or unfiled when
+// owner is null. Resolves to the new document's id, or null when nothing was attached.
+export function useAttachFile() {
+  const addDocumentLink = useProjectStore((s) => s.addDocumentLink);
+  const pickAsset = useProjectStore((s) => s.pickAsset);
+  return async (owner: string | null) => {
+    try {
+      const picked = await pickAsset("document");
+      if (!picked) return null;
+      const ext = picked.name.split(".").pop()?.toLowerCase() ?? "";
+      return addDocumentLink(owner, { title: picked.name.replace(/\.[^.]+$/, ""), file: picked.rel, kind: ext === "pdf" ? "pdf" : "note" });
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Could not copy that file into the project.");
+      return null;
+    }
+  };
+}
+
 // Documents attached to a product, bus or device, plus the product's own page.
 // Shared by the diagram inspector and the documentation view.
 export function DocumentLinks({ entityId, compact = false, readOnly = false }: { entityId: string; compact?: boolean; readOnly?: boolean }) {
   const project = useProject();
-  const { addDocumentLink, unlinkDocument, updatePreset, pickAsset } = useProjectStore();
+  const { addDocumentLink, unlinkDocument, updatePreset } = useProjectStore();
+  const attachFile = useAttachFile();
   const projectDir = useProjectDir();
   const preset = project.presets[entityId];
-
-  const attachFile = async () => {
-    try {
-      const picked = await pickAsset("document");
-      if (!picked) return;
-      const ext = picked.name.split(".").pop()?.toLowerCase() ?? "";
-      const title = picked.name.replace(/\.[^.]+$/, "");
-      addDocumentLink(entityId, { title, file: picked.rel, kind: ext === "pdf" ? "pdf" : "note" });
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Could not copy that file into the project.");
-    }
-  };
   const docs = documentsFor(project, entityId);
   const [adding, setAdding] = useState(false);
   const [editingProduct, setEditingProduct] = useState(false);
@@ -143,7 +150,7 @@ export function DocumentLinks({ entityId, compact = false, readOnly = false }: {
             <Link2 className="h-3.5 w-3.5" /> Add document link
           </button>
           {isDesktop() && (
-            <button className="flex items-center gap-1 text-brand-ink hover:underline" onClick={() => void attachFile()} title="Copy a PDF or other file into the project folder">
+            <button className="flex items-center gap-1 text-brand-ink hover:underline" onClick={() => void attachFile(entityId)} title="Copy a PDF or other file into the project folder">
               <FileUp className="h-3.5 w-3.5" /> Attach file
             </button>
           )}
