@@ -51,7 +51,7 @@ export function ProtobufView() {
 
   return (
     <div className="flex h-full">
-      <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white">
+      <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white text-[13px]">
         <div className="px-4 pt-4 text-[15px] font-semibold">Message library</div>
         <div className="flex flex-col gap-2 p-3">
           <button onClick={showAll} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left ${!deviceFilter ? "bg-brand-wash font-medium text-brand-ink" : "hover:bg-slate-50"}`}>
@@ -61,7 +61,7 @@ export function ProtobufView() {
           </button>
           <input className="input" aria-label="Search messages" placeholder="Find a message, service or field..." value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
-        <SidebarSection title="By device" caption="Tx / Rx counts are messages">
+        <SidebarSection title="By device">
           {byDevice.length === 0 && <div className="px-3 py-1 text-slate-400">No message has a sender or receiver yet.</div>}
           {byDevice.map((entry) => (
             <button
@@ -92,7 +92,7 @@ export function ProtobufView() {
               </option>
             ))}
           </select>
-          <select className="input" style={{ width: "auto" }} aria-label="Direction" value={direction} disabled={!deviceFilter} onChange={(e) => setDirection(e.target.value as Direction)} title={deviceFilter ? undefined : "Pick a device first"}>
+          <select className="input" style={{ width: "auto" }} aria-label="Direction" value={direction} disabled={!deviceFilter && mode === "messages"} onChange={(e) => setDirection(e.target.value as Direction)} title={deviceFilter || mode === "by-device" ? undefined : "Pick a device first"}>
             <option value="all">Sent and received</option>
             <option value="sent">Sent</option>
             <option value="received">Received</option>
@@ -234,7 +234,7 @@ function DirectionList({
         {messages.map((message) => (
           <button key={message.id} onClick={() => onSelect(message.id)} className={`flex items-center gap-3 px-4 py-1 text-left ${message.id === selectedId ? "bg-brand-wash text-brand-ink" : "hover:bg-slate-50"}`}>
             <span className="w-40 truncate font-medium">{message.name}</span>
-            <span className="w-32 truncate font-mono text-[12px] text-slate-600">{messageMeta(message)}</span>
+            <span className="w-40 truncate font-mono text-[12px] text-slate-600">{messageMeta(message)}</span>
             <span className="flex min-w-0 flex-1 flex-wrap gap-1 text-slate-600">
               {other(message).map((end, index) => (
                 <span key={index} className="inline-flex items-center gap-1 rounded bg-slate-100 py-0.5 pl-0.5 pr-1.5 text-[12px] text-slate-700">
