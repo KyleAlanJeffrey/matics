@@ -120,7 +120,8 @@ the stack decision in `00-tech-stack.md`.
   `fitView` prop frames whatever is measured first). Each project gets its own canvas, so
   opening another one frames it too.
 - The inspector is read-only until Edit is pressed; removal buttons appear only while
-  editing. The same rule holds for every inspector in the app.
+  editing. The Communications editors (CAN frames and Protobuf messages) are the
+  exception: every property there is edited in place.
 
 ## Documentation
 
@@ -145,7 +146,11 @@ the stack decision in `00-tech-stack.md`.
   comments. Nodes are matched to devices by name (`matchNode`) in an import dialog.
 - Protobuf messages come from `.proto` files (`src/model/proto.ts`) and get a sender and
   receivers (device plus service), a transport (suggested from the sender service's port),
-  fields, documents and a note.
+  fields, documents and a note. Each end is a device select plus a service select
+  ("Any service" when it can be any); receivers are rows you add and remove. A field's
+  type box takes `repeated <type>` as in the schema. As on the CAN tab, the sidebar
+  lists devices with their sent and received counts (`messagesByDevice`) and filters
+  on click, and "By device" shows each device's messages split into sends and receives.
 
 ## Sketches
 

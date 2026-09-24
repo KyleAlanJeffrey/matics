@@ -450,7 +450,7 @@ function PartyChip({ project, partyId }: { project: Project; partyId: string }) 
   );
 }
 
-function PartyThumb({ project, partyId, size = "md" }: { project: Project; partyId: string; size?: "sm" | "md" | "lg" }) {
+export function PartyThumb({ project, partyId, size = "md" }: { project: Project; partyId: string; size?: "sm" | "md" | "lg" }) {
   const preset = project.presets[partyPresetId(project, partyId) ?? ""];
   const src = assetSrc(preset?.imageUrl, useProjectDir());
   const box = size === "sm" ? "h-4 w-5" : size === "lg" ? "h-9 w-11" : "h-6 w-8";
@@ -526,7 +526,7 @@ function FrameEditor({ frame, onClose }: { frame: CanFrame; onClose: () => void 
           </select>
         </Field>
 
-        <Field label="Receivers" icon={<ArrowDownToLine className="h-3.5 w-3.5 text-teal-600" />}>
+        <Field label="Receivers" icon={<ArrowDownToLine className="h-3.5 w-3.5 text-teal-600" />} group>
           <div className="flex flex-wrap gap-1">
             {frame.receiverIds.map((id) => (
               <span key={id} className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 py-0.5 pl-1 pr-1">
@@ -539,6 +539,7 @@ function FrameEditor({ frame, onClose }: { frame: CanFrame; onClose: () => void 
           </div>
           <select
             className="input mt-1 text-slate-500"
+            aria-label="Add receiver"
             value=""
             onChange={(e) => {
               if (e.target.value) updateFrame(frame.id, { receiverIds: [...frame.receiverIds, e.target.value] });
@@ -555,7 +556,7 @@ function FrameEditor({ frame, onClose }: { frame: CanFrame; onClose: () => void 
           </select>
         </Field>
 
-        <Field label="Buses">
+        <Field label="Buses" group>
           <BusPicker project={project} busIds={frame.busIds} onChange={(busIds) => updateFrame(frame.id, { busIds })} />
           <span className="text-[11px] text-slate-400">A frame forwarded by a gateway can be on several networks.</span>
         </Field>
@@ -609,6 +610,7 @@ function BusPicker({ project, busIds, onChange, compact = false }: { project: Pr
       {remaining.length > 0 && (
         <select
           className={`input text-slate-500 ${compact ? "py-1" : ""}`}
+          aria-label="Add CAN bus"
           style={{ width: "auto" }}
           value=""
           onChange={(e) => {
@@ -648,18 +650,31 @@ function HexInput({ value, onCommit }: { value: number; onCommit: (value: number
   );
 }
 
-function Field({ label, icon, children }: { label: string; icon?: React.ReactNode; children: React.ReactNode }) {
+// A label around a group of controls clicks the first of them (a remove button) when its
+// text is clicked, so groups get a plain heading instead.
+function Field({ label, icon, group = false, children }: { label: string; icon?: React.ReactNode; group?: boolean; children: React.ReactNode }) {
+  const heading = (
+    <span className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
+      {icon} {label}
+    </span>
+  );
+  if (group) {
+    return (
+      <div role="group" aria-label={label} className="flex min-w-0 flex-col gap-1">
+        {heading}
+        {children}
+      </div>
+    );
+  }
   return (
     <label className="flex min-w-0 flex-col gap-1">
-      <span className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
-        {icon} {label}
-      </span>
+      {heading}
       {children}
     </label>
   );
 }
 
-function SidebarSection({ title, caption, children }: { title: string; caption?: string; children: React.ReactNode }) {
+export function SidebarSection({ title, caption, children }: { title: string; caption?: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5 px-3 pb-2">
       <div className="flex items-baseline justify-between px-3 pb-1 pt-2">
@@ -671,6 +686,6 @@ function SidebarSection({ title, caption, children }: { title: string; caption?:
   );
 }
 
-function CountBadge({ active, children }: { active?: boolean; children: React.ReactNode }) {
+export function CountBadge({ active, children }: { active?: boolean; children: React.ReactNode }) {
   return <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${active ? "bg-brand text-charcoal" : "bg-slate-100 text-slate-600"}`}>{children}</span>;
 }
