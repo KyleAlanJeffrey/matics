@@ -450,7 +450,7 @@ function PartyChip({ project, partyId }: { project: Project; partyId: string }) 
   );
 }
 
-function PartyThumb({ project, partyId, size = "md" }: { project: Project; partyId: string; size?: "sm" | "md" | "lg" }) {
+export function PartyThumb({ project, partyId, size = "md" }: { project: Project; partyId: string; size?: "sm" | "md" | "lg" }) {
   const preset = project.presets[partyPresetId(project, partyId) ?? ""];
   const src = assetSrc(preset?.imageUrl, useProjectDir());
   const box = size === "sm" ? "h-4 w-5" : size === "lg" ? "h-9 w-11" : "h-6 w-8";
@@ -539,6 +539,7 @@ function FrameEditor({ frame, onClose }: { frame: CanFrame; onClose: () => void 
           </div>
           <select
             className="input mt-1 text-slate-500"
+            aria-label="Add receiver"
             value=""
             onChange={(e) => {
               if (e.target.value) updateFrame(frame.id, { receiverIds: [...frame.receiverIds, e.target.value] });
@@ -609,6 +610,7 @@ function BusPicker({ project, busIds, onChange, compact = false }: { project: Pr
       {remaining.length > 0 && (
         <select
           className={`input text-slate-500 ${compact ? "py-1" : ""}`}
+          aria-label="Add CAN bus"
           style={{ width: "auto" }}
           value=""
           onChange={(e) => {
@@ -672,7 +674,7 @@ function Field({ label, icon, group = false, children }: { label: string; icon?:
   );
 }
 
-function SidebarSection({ title, caption, children }: { title: string; caption?: string; children: React.ReactNode }) {
+export function SidebarSection({ title, caption, children }: { title: string; caption?: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5 px-3 pb-2">
       <div className="flex items-baseline justify-between px-3 pb-1 pt-2">
@@ -684,6 +686,6 @@ function SidebarSection({ title, caption, children }: { title: string; caption?:
   );
 }
 
-function CountBadge({ active, children }: { active?: boolean; children: React.ReactNode }) {
+export function CountBadge({ active, children }: { active?: boolean; children: React.ReactNode }) {
   return <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${active ? "bg-brand text-charcoal" : "bg-slate-100 text-slate-600"}`}>{children}</span>;
 }
