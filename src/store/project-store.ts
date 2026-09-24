@@ -117,6 +117,9 @@ export interface IoMapImportResult {
   interfaces: number;
   mappingsAdded: number;
   mappingsUpdated: number;
+  // Existing signals and mappings left as they were because which binding they belong to
+  // is unclear (see pairImported).
+  unpaired: number;
 }
 
 interface ProjectState {
@@ -215,7 +218,7 @@ interface ProjectState {
   // range and notes. Interfaces match by module and name, or take over the one interface of
   // that name added by hand, and their mappings by symbol; a match keeps its name,
   // register, peer and notes. A channel or symbol bound to several variables keeps one
-  // record per variable.
+  // record per variable; see pairImported for when a record is left unpaired.
   importIoMap: (deviceId: string, modules: ImportedModule[], interfaces: ImportedInterface[]) => IoMapImportResult;
   addNetInterface: (netInterface: Omit<NetInterface, "id">) => string;
   updateNetInterface: (interfaceId: string, patch: Partial<Omit<NetInterface, "id">>) => void;
@@ -375,17 +378,29 @@ function dropNetInterface(project: Project, interfaceId: string) {
 
 // Inside a set() the project is an immer draft; this runs a set that undo will not record.
 // Pairs imported bindings with the records they update. A channel or symbol bound to
-// several variables keeps one record per variable, so records whose variable is unchanged
-// pair first; the rest pair in order, which lets a renamed variable update its record.
-function pairImported<R extends { variable?: string }, I extends { variable?: string }>(existing: R[], imported: I[], sameKey: (record: R, item: I) => boolean): (R | undefined)[] {
+// several variables keeps one record per variable: a record whose variable is unchanged
+// pairs first, and what is left pairs only one to one, so a renamed variable still updates
+// its record. With several left on either side, which was renamed to which is a guess;
+// those import as new records and the old ones are left as they were (`unpaired`).
+function pairImported<K extends string, R extends Record<K, string> & { variable?: string }, I extends Record<K, string> & { variable?: string }>(key: K, existing: R[], imported: I[]) {
+  const keyOf = (binding: Record<K, string>): string => binding[key];
   const claimed = new Set<R>();
-  const claim = (item: I, sameVariable: boolean) => {
-    const match = existing.find((r) => !claimed.has(r) && sameKey(r, item) && (!sameVariable || r.variable === item.variable));
+  const exact = imported.map((item) => {
+    const match = existing.find((r) => !claimed.has(r) && keyOf(r) === keyOf(item) && r.variable === item.variable);
     if (match) claimed.add(match);
     return match;
-  };
-  const exact = imported.map((item) => claim(item, true));
-  return exact.map((match, i) => match ?? claim(imported[i], false));
+  });
+  const ambiguous = new Set<R>();
+  const matches = exact.map((match, i) => {
+    if (match) return match;
+    const value = keyOf(imported[i]);
+    const records = existing.filter((r) => !claimed.has(r) && keyOf(r) === value);
+    const items = imported.filter((item, j) => !exact[j] && keyOf(item) === value);
+    if (records.length === 1 && items.length === 1) return records[0];
+    records.forEach((r) => ambiguous.add(r));
+    return undefined;
+  });
+  return { matches, unpaired: ambiguous.size };
 }
 
 function withoutHistory(run: () => void) {
@@ -971,7 +986,7 @@ export const useProjectStore = create<ProjectState>()(
         }),
 
       importIoMap: (deviceId, modules, interfaces) => {
-        const result: IoMapImportResult = { modules: 0, added: 0, updated: 0, interfaces: 0, mappingsAdded: 0, mappingsUpdated: 0 };
+        const result: IoMapImportResult = { modules: 0, added: 0, updated: 0, interfaces: 0, mappingsAdded: 0, mappingsUpdated: 0, unpaired: 0 };
         set((state) => {
           const project = state.project;
           for (const imported of modules) {
@@ -982,7 +997,8 @@ export const useProjectStore = create<ProjectState>()(
               result.modules++;
             }
             const existing = Object.values(project.ioSignals).filter((s) => s.moduleId === module.id);
-            const matches = pairImported(existing, imported.signals, (s, signal) => s.channel === signal.channel);
+            const { matches, unpaired } = pairImported("channel", existing, imported.signals);
+            result.unpaired += unpaired;
             imported.signals.forEach((signal, i) => {
               const match = matches[i];
               if (match) {
@@ -1000,9 +1016,11 @@ export const useProjectStore = create<ProjectState>()(
           for (const imported of interfaces) {
             const named = Object.values(project.netInterfaces).filter((i) => i.deviceId === deviceId && i.name === imported.name);
             let netInterface = named.find((i) => i.module === imported.module);
-            // One added by hand has no module. Take it over only when there is no doubt which.
+            // One added by hand has no module. Take it over only when there is no doubt: it is
+            // the only candidate, and the file has no other interface of that name.
             const unscoped = named.filter((i) => !i.module);
-            if (!netInterface && unscoped.length === 1) {
+            const incoming = interfaces.filter((i) => i.name === imported.name).length;
+            if (!netInterface && unscoped.length === 1 && incoming === 1) {
               netInterface = unscoped[0];
               netInterface.module = imported.module;
             }
@@ -1012,7 +1030,8 @@ export const useProjectStore = create<ProjectState>()(
               result.interfaces++;
             }
             const existing = Object.values(project.netMappings).filter((m) => m.interfaceId === netInterface.id);
-            const matches = pairImported(existing, imported.mappings, (m, mapping) => m.symbol === mapping.symbol);
+            const { matches, unpaired } = pairImported("symbol", existing, imported.mappings);
+            result.unpaired += unpaired;
             imported.mappings.forEach((mapping, i) => {
               const match = matches[i];
               if (match) {
