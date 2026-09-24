@@ -526,7 +526,7 @@ function FrameEditor({ frame, onClose }: { frame: CanFrame; onClose: () => void 
           </select>
         </Field>
 
-        <Field label="Receivers" icon={<ArrowDownToLine className="h-3.5 w-3.5 text-teal-600" />}>
+        <Field label="Receivers" icon={<ArrowDownToLine className="h-3.5 w-3.5 text-teal-600" />} group>
           <div className="flex flex-wrap gap-1">
             {frame.receiverIds.map((id) => (
               <span key={id} className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 py-0.5 pl-1 pr-1">
@@ -555,7 +555,7 @@ function FrameEditor({ frame, onClose }: { frame: CanFrame; onClose: () => void 
           </select>
         </Field>
 
-        <Field label="Buses">
+        <Field label="Buses" group>
           <BusPicker project={project} busIds={frame.busIds} onChange={(busIds) => updateFrame(frame.id, { busIds })} />
           <span className="text-[11px] text-slate-400">A frame forwarded by a gateway can be on several networks.</span>
         </Field>
@@ -648,12 +648,25 @@ function HexInput({ value, onCommit }: { value: number; onCommit: (value: number
   );
 }
 
-function Field({ label, icon, children }: { label: string; icon?: React.ReactNode; children: React.ReactNode }) {
+// A label around a group of controls clicks the first of them (a remove button) when its
+// text is clicked, so groups get a plain heading instead.
+function Field({ label, icon, group = false, children }: { label: string; icon?: React.ReactNode; group?: boolean; children: React.ReactNode }) {
+  const heading = (
+    <span className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
+      {icon} {label}
+    </span>
+  );
+  if (group) {
+    return (
+      <div role="group" aria-label={label} className="flex min-w-0 flex-col gap-1">
+        {heading}
+        {children}
+      </div>
+    );
+  }
   return (
     <label className="flex min-w-0 flex-col gap-1">
-      <span className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
-        {icon} {label}
-      </span>
+      {heading}
       {children}
     </label>
   );
