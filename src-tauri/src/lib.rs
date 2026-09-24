@@ -19,6 +19,8 @@ pub fn run() {
                 app.set_menu(menu)?;
                 app.on_menu_event(|app, event| menu::forward(app, event.id().as_ref()));
             }
+            #[cfg(not(target_os = "macos"))]
+            package::opened_at_launch(app.handle());
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
@@ -44,18 +46,17 @@ pub fn run() {
             storage::remove_asset,
             storage::copy_asset,
             storage::open_asset,
-            storage::read_import_file,
             storage::write_export_file,
             storage::fetch_pdf,
-            package::export_package,
-            package::import_package,
+            package::compress_project,
+            package::open_project_path,
             package::take_opened_files,
         ])
         .manage(package::OpenedFiles::default())
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
-            // Finder hands over double-clicked .matics files, also before the webview loads.
+            // Finder hands over double-clicked projects, also before the webview loads.
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = event {
                 package::files_opened(app, urls);

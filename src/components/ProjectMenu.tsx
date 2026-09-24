@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { ChevronDown, Copy, FilePlus2, FolderOpen, LayoutGrid, Package, PackageOpen, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, Copy, FilePlus2, FolderOpen, LayoutGrid, Package, Pencil, Trash2 } from "lucide-react";
 import { useProjectStore } from "@/store/project-store";
 import { sampleProject } from "@/model/sample-project";
 import { entryDate, fileManagerName, isDesktop, shortPath, trashName } from "@/lib/desktop";
@@ -19,8 +19,7 @@ export function ProjectMenu() {
     duplicateProject,
     deleteProject,
     revealProject,
-    packageProject,
-    openPackage,
+    saveCompressedCopy,
   } = useProjectStore();
   const { open, setOpen, ref: menuRef } = useDropdown();
   const navigate = useNavigate();
@@ -133,8 +132,7 @@ export function ProjectMenu() {
           {isDesktop() && (
             <>
               <MenuItem icon={FolderOpen} label={`Show in ${fileManagerName()}`} hint={projectDir ? shortPath(projectDir) : undefined} onClick={() => void revealProject().then(() => setOpen(false))} />
-              <MenuItem icon={Package} label="Package as .matics..." onClick={() => runAndClose(packageProject)} />
-              <MenuItem icon={PackageOpen} label="Open .matics package..." onClick={() => runAndClose(openPackage)} />
+              <MenuItem icon={Package} label="Save compressed copy..." onClick={() => runAndClose(saveCompressedCopy)} />
             </>
           )}
           <MenuSeparator />

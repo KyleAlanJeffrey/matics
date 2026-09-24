@@ -1,7 +1,6 @@
 import { desktop, fileName, isDesktop } from "./desktop";
 
 const FILTERS: Record<string, { name: string; extensions: string[] }> = {
-  json: { name: "JSON", extensions: ["json"] },
   pdf: { name: "PDF document", extensions: ["pdf"] },
   png: { name: "PNG image", extensions: ["png"] },
   svg: { name: "SVG image", extensions: ["svg"] },

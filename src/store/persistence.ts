@@ -1,6 +1,5 @@
 import { del as idbDel, get as idbGet, set as idbSet } from "idb-keyval";
 import type { Project, ProjectMeta, WorkspacePrefs } from "@/model/types";
-import { saveFile } from "@/lib/save-file";
 
 const INDEX_KEY = "diagram-maker:projects";
 const CURRENT_KEY = "diagram-maker:current";
@@ -44,14 +43,6 @@ export async function saveStoredProject(project: Project) {
 
 export async function deleteStoredProject(id: string) {
   await idbDel(projectKey(id));
-}
-
-export async function downloadJson(filename: string, payload: unknown) {
-  await saveFile(filename, new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
-}
-
-export async function readJsonFile<T>(file: File): Promise<T> {
-  return JSON.parse(await file.text()) as T;
 }
 
 export function safeFilename(name: string) {

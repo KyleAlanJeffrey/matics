@@ -1,9 +1,9 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
-import { Archive, ChevronDown, FolderOpen, FolderSearch, LayoutGrid, List, PackageOpen, Plus, Search, Star, Upload } from "lucide-react";
+import { Archive, ChevronDown, FolderInput, FolderOpen, LayoutGrid, List, PackageOpen, Plus, Search, Star } from "lucide-react";
 import { prefKey, useProjectStore } from "@/store/project-store";
 import { desktop, entryDate, fileManagerName, isDesktop, shortPath } from "@/lib/desktop";
-import { reportErrors, useRunCommand, useShowOpenedProject } from "@/lib/commands";
+import { reportErrors, shortcutFor, useRunCommand } from "@/lib/commands";
 import { MenuItem, MenuPanel, useDropdown } from "@/components/Menu";
 import { dayLabel } from "./dates";
 import { useSummaries } from "./summaries";
@@ -20,7 +20,7 @@ const SECTIONS: { id: Section; label: string; icon: typeof Star; title: string; 
     icon: FolderOpen,
     title: "Projects",
     subtitle: "Your diagrams, documentation and sketches in one place.",
-    empty: "No projects yet. Start a new one or import one.",
+    empty: "No projects yet. Start a new one or open one.",
   },
   { id: "starred", label: "Starred", icon: Star, title: "Starred", subtitle: "The projects you starred.", empty: "Star a project from its menu to keep it here." },
   {
@@ -119,7 +119,7 @@ export function HomeView() {
               <p className="mt-1 text-[15px] text-slate-600">{section.subtitle}</p>
             </div>
             <div className="flex shrink-0 items-center gap-3 pt-1">
-              <ImportButton />
+              {isDesktop() && <OpenButton />}
               <NewProjectButton />
             </div>
           </div>
@@ -261,52 +261,26 @@ function NewProjectButton() {
   );
 }
 
-const IMPORT_BUTTON = "flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-[14px] font-medium text-slate-800 hover:bg-slate-50";
-
-// The desktop app can open packages and folders as well as diagram files; the browser
-// build only reads diagram files, through a file input.
-function ImportButton() {
+// The browser build keeps its projects in the browser and has no files to open.
+function OpenButton() {
   const run = useRunCommand();
   const { open, setOpen, ref } = useDropdown();
-  const input = useRef<HTMLInputElement>(null);
-  const importProject = useProjectStore((s) => s.importProject);
-  const showOpened = useShowOpenedProject();
-
-  if (!isDesktop()) {
-    return (
-      <>
-        <button onClick={() => input.current?.click()} className={IMPORT_BUTTON}>
-          <Upload className="h-4 w-4" /> Import project
-        </button>
-        <input
-          ref={input}
-          type="file"
-          accept="application/json,.json"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            e.target.value = "";
-            if (file) void reportErrors(() => showOpened(() => importProject(file)));
-          }}
-        />
-      </>
-    );
-  }
-
   const item = (command: Parameters<typeof run>[0]) => () => {
     setOpen(false);
     run(command);
   };
   return (
     <div ref={ref} className="relative">
-      <button onClick={() => setOpen((o) => !o)} className={IMPORT_BUTTON}>
-        <Upload className="h-4 w-4" /> Import project <ChevronDown className="h-4 w-4 text-slate-500" />
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-[14px] font-medium text-slate-800 hover:bg-slate-50"
+      >
+        <FolderInput className="h-4 w-4" /> Open project <ChevronDown className="h-4 w-4 text-slate-500" />
       </button>
       {open && (
         <MenuPanel align="right">
-          <MenuItem icon={PackageOpen} label="Open package (.matics)..." onClick={item("file:open-package")} />
-          <MenuItem icon={FolderSearch} label="Open project folder..." onClick={item("file:open-folder")} />
-          <MenuItem icon={Upload} label="Import diagram (.json)..." onClick={item("file:import-diagram")} />
+          <MenuItem icon={FolderOpen} label="Open project..." hint={shortcutFor("file:open-project")} onClick={item("file:open-project")} />
+          <MenuItem icon={PackageOpen} label="Open compressed project..." hint={shortcutFor("file:open-compressed")} onClick={item("file:open-compressed")} />
         </MenuPanel>
       )}
     </div>

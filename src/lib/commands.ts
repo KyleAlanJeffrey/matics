@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { useProjectStore } from "@/store/project-store";
-import { desktop, fileName, hasNativeMenu, isDesktop } from "./desktop";
+import { MATICS_FILTER, useProjectStore } from "@/store/project-store";
+import { desktop, desktopPlatform, hasNativeMenu, isDesktop } from "./desktop";
 import { undoOrRedo } from "./editing";
 import { checkForUpdates } from "./updates";
 
@@ -10,14 +10,10 @@ import { checkForUpdates } from "./updates";
 export type CommandId =
   | "app:check-updates"
   | "file:new"
-  | "file:open-folder"
-  | "file:open-package"
+  | "file:open-project"
+  | "file:open-compressed"
   | "file:save"
-  | "file:export-package"
-  | "file:import-diagram"
-  | "file:export-diagram"
-  | "file:import-products"
-  | "file:export-products"
+  | "file:save-compressed"
   | "file:export-report-pdf"
   | "file:export-report-png"
   | "file:export-schematic-png"
@@ -48,11 +44,9 @@ const PAGES: Partial<Record<CommandId, string>> = {
 // and Z are handled by AppShell everywhere.
 const SHORTCUTS: { key: string; shift?: boolean; command: CommandId }[] = [
   { key: "n", command: "file:new" },
-  { key: "o", command: "file:open-folder" },
-  { key: "o", shift: true, command: "file:open-package" },
-  { key: "s", shift: true, command: "file:export-package" },
-  { key: "i", shift: true, command: "file:import-diagram" },
-  { key: "e", shift: true, command: "file:export-diagram" },
+  { key: "o", command: "file:open-project" },
+  { key: "o", shift: true, command: "file:open-compressed" },
+  { key: "s", shift: true, command: "file:save-compressed" },
   { key: "p", command: "file:export-report-pdf" },
   { key: "0", command: "view:home" },
   { key: "1", command: "view:schematic" },
@@ -69,10 +63,15 @@ export function shortcutFor(command: CommandId) {
   return `${mod}+${shortcut.shift ? "Shift+" : ""}${shortcut.key.toUpperCase()}`;
 }
 
-async function pickJson(title: string): Promise<File | null> {
-  const path = await desktop.pickFile(title, [{ name: "JSON", extensions: ["json"] }]);
-  if (!path) return null;
-  return new File([await desktop.readImportFile(path)], fileName(path), { type: "application/json" });
+// macOS shows a .matics folder as a single document, which only a file panel can pick; there
+// it also picks compressed files. Elsewhere a .matics folder is picked as a folder.
+async function pickProject() {
+  if (desktopPlatform() === "mac") return desktop.pickFile("Open project", [MATICS_FILTER]);
+  return desktop.pickFolder("Open a .matics project folder");
+}
+
+async function openPicked(path: string | null) {
+  if (path) await useProjectStore.getState().openProjectPath(path);
 }
 
 export async function reportErrors(action: () => Promise<unknown>) {
@@ -114,22 +113,10 @@ export function useCommands(save: () => Promise<void>) {
           const name = window.prompt("Name for the new diagram", "New diagram");
           if (name?.trim()) await store().createProject(name.trim(), { copyLibrary: true });
         },
-        "file:open-folder": () => store().openProjectFolder(),
-        "file:open-package": () => store().openPackage(),
-        "file:export-package": () => store().packageProject(),
+        "file:open-project": async () => openPicked(await pickProject()),
+        "file:open-compressed": async () => openPicked(await desktop.pickFile("Open compressed project", [MATICS_FILTER])),
+        "file:save-compressed": () => store().saveCompressedCopy(),
         "file:save": save,
-        "file:import-diagram": async () => {
-          const file = await pickJson("Import diagram");
-          if (file) await store().importProject(file);
-        },
-        "file:export-diagram": () => store().exportProject(),
-        "file:import-products": async () => {
-          const file = await pickJson("Import products");
-          if (!file) return;
-          const count = await store().importLibrary(file);
-          window.alert(count === 1 ? "Imported 1 product." : `Imported ${count} products.`);
-        },
-        "file:export-products": () => store().exportLibrary(),
         "edit:undo": async () => undoOrRedo("undo"),
         "edit:redo": async () => undoOrRedo("redo"),
       };

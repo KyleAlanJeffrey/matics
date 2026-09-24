@@ -27,9 +27,10 @@ the stack decision in `00-tech-stack.md`.
   are the platform's own items so text fields keep copy, paste and undo. WKWebView offers
   key equivalents to the page first, so the page's Cmd+S and Cmd+Z handlers still run
   while it has focus.
-- Imports use the native open panel plus `read_import_file` (a file input cannot be opened
-  from a menu click, which is not a user gesture); exports use the native save panel plus
-  `write_export_file`.
+- Opening a project uses the native open panel (a file input cannot be opened from a menu
+  click, which is not a user gesture); exports use the native save panel plus
+  `write_export_file`. On macOS, Open Project uses a file panel, because a folder panel
+  cannot pick a `.matics` package; elsewhere it uses a folder panel.
 - The charcoal app header is the title bar: a `data-tauri-drag-region`, double-click to
   maximize. On macOS the traffic lights sit in its left inset (`titleBarStyle:
   "Overlay"`). On Windows the window has no decorations (`tauri.windows.conf.json`) and
@@ -49,7 +50,8 @@ the stack decision in `00-tech-stack.md`.
 
 ## Storage and projects
 
-- A project is a folder: `project.json` plus `assets/`. Rust commands in `storage.rs` own
+- A project is a `.matics` folder: `project.json` plus `assets/`. There is no other
+  project format to import or export. Rust commands in `storage.rs` own
   every filesystem operation (config, listing projects, atomic writes, copying picked files
   into `assets/`, moving a project to the Trash). Asset paths are validated so they cannot
   escape the project folder.
@@ -57,15 +59,17 @@ the stack decision in `00-tech-stack.md`.
   (folders) and an IndexedDB one for the browser dev build. The store only talks to
   `storage`.
 - Pictures and attached files are `assets/...` refs resolved through `assetSrc()` with
-  Tauri's asset protocol. Inline data URLs (browser uploads, imported JSON) are written to
-  `assets/` on load and save; exports inline them again so JSON stays portable.
+  Tauri's asset protocol. Inline data URLs (browser uploads) are written to `assets/` on load
+  and save.
 - Autosave is debounced (400 ms). Replacing the open project flushes the pending save
   first, and editors that hold back changes (the sketch canvas) register a flush so their
   edits land in the project they came from. Cmd+S saves immediately.
-- A project packages into one `.matics` file (zip of `project.json` and `assets/`). A
-  `.matics` file opens as a new project from Finder or File > Open Package; Finder launches
-  queue the file in Rust until the webview asks for it. Unpacking is bounded in size and
-  validates the project before it is written.
+- File > Save Compressed Copy zips a project into one `.matics` file (`project.json` and
+  `assets/`). A compressed file opens as a new project from Finder or File > Open
+  Compressed Project; a `.matics` folder opens in place (`open_project_path` decides which).
+  Projects handed to the app at launch (Finder on macOS, the command line on Windows and
+  Linux) are queued in Rust until the webview asks for them. Unpacking is bounded in size
+  and validates the project before it is written.
 
 ## Undo
 

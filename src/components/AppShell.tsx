@@ -97,7 +97,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       if (!mod) return;
       const key = event.key.toLowerCase();
       // Save works from inside text fields too, and keeps the browser's save dialog away.
-      // Shift+S packages the project instead.
+      // Shift+S saves a compressed copy instead.
       if (key === "s" && !event.shiftKey) {
         event.preventDefault();
         void save();

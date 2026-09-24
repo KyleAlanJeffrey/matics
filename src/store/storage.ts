@@ -28,10 +28,9 @@ export interface ProjectStorage {
   savePrefs(prefs: WorkspacePrefs): Promise<void>;
   // Folder of a project, when it has one.
   dirOf(id: string): string | null;
-  // Opens a project folder from anywhere on disk and returns its meta.
-  openFolder?(): Promise<ProjectMeta | null>;
-  // Unpacks a .matics package into a new folder under the root and returns its meta.
-  openPackage?(path: string): Promise<ProjectMeta>;
+  // Opens a .matics project from anywhere on disk and returns its meta: a folder where it
+  // is, a compressed file unpacked into a new folder under the root.
+  openPath?(path: string): Promise<ProjectMeta>;
   rootDir?: string;
 }
 
@@ -134,10 +133,18 @@ class DesktopStorage implements ProjectStorage {
     await desktop.saveConfig(this.config);
   }
 
-  async openFolder() {
-    const dir = await desktop.pickFolder("Open a diagram project folder");
-    if (!dir) return null;
-    assertCompleteProject(await desktop.readProject(dir), "That folder's project");
+  async openPath(path: string) {
+    const { dir, unpacked } = await desktop.openProjectPath(path, this.rootDir);
+    const raw = await desktop.readProject(dir);
+    if (unpacked) {
+      // Always a fresh id: the file may be a snapshot of a project that is open here.
+      const id = `project-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+      await desktop.writeProject(dir, { ...raw, id });
+      const entry = await desktop.projectEntry(dir);
+      this.dirs.set(entry.id, entry.dir);
+      return { id: entry.id, name: entry.name, updatedAt: entry.updatedAt, dir: entry.dir };
+    }
+    assertCompleteProject(raw, `"${raw.name}"`);
     const entry = await this.claim(await desktop.projectEntry(dir));
     // Only direct children of the root are listed on their own; remember everything else.
     const listed = (await desktop.listProjects(this.rootDir)).some((e) => e.dir === entry.dir);
@@ -145,17 +152,6 @@ class DesktopStorage implements ProjectStorage {
       this.config.recent.push(entry.dir);
       await desktop.saveConfig(this.config);
     }
-    return { id: entry.id, name: entry.name, updatedAt: entry.updatedAt, dir: entry.dir };
-  }
-
-  async openPackage(path: string) {
-    const dir = await desktop.importPackage(path, this.rootDir);
-    // Always a fresh id: the package may be a snapshot of a project that is open here.
-    const raw = await desktop.readProject(dir);
-    const id = `project-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-    await desktop.writeProject(dir, { ...raw, id });
-    const entry = await desktop.projectEntry(dir);
-    this.dirs.set(entry.id, entry.dir);
     return { id: entry.id, name: entry.name, updatedAt: entry.updatedAt, dir: entry.dir };
   }
 }
