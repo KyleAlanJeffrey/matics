@@ -1,10 +1,12 @@
-//! Projects live on disk as folders the user can copy, sync or zip:
+//! Projects live on disk as `.matics` folders the user can copy, sync or commit:
 //!
 //! ```text
-//! <projects root>/<project folder>/
+//! <projects root>/<name>.matics/
 //!   project.json      the Project (see src/model/types.ts)
 //!   assets/           device pictures and attached documents
 //! ```
+//!
+//! The same folder zipped into one `<name>.matics` file is the compressed form (package.rs).
 //!
 //! The webview never touches the filesystem directly; every operation is a command here.
 
@@ -20,6 +22,16 @@ use tauri::{AppHandle, Manager};
 
 pub const PROJECT_FILE: &str = "project.json";
 pub const ASSETS_DIR: &str = "assets";
+/// Both forms of a project, the folder and the compressed file, end in `.matics`.
+pub const MATICS_EXTENSION: &str = "matics";
+
+pub fn has_matics_extension(path: &Path) -> bool {
+    path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case(MATICS_EXTENSION))
+}
+
+pub fn is_project_dir(path: &Path) -> bool {
+    path.is_dir() && has_matics_extension(path) && path.join(PROJECT_FILE).is_file()
+}
 
 #[derive(Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -98,7 +110,7 @@ pub fn list_projects(root: String) -> CmdResult<Vec<ProjectEntry>> {
     };
     for item in read.flatten() {
         let dir = item.path();
-        if dir.is_dir() && dir.join(PROJECT_FILE).is_file() {
+        if is_project_dir(&dir) {
             if let Ok(entry) = read_project_entry(&dir) {
                 entries.push(entry);
             }
@@ -156,15 +168,15 @@ pub fn write_project(dir: String, json: String) -> CmdResult<()> {
     write_atomic(&dir.join(PROJECT_FILE), json.as_bytes())
 }
 
-/// Picks a free folder name under `root` for a new project.
+/// Picks a free `<name>.matics` folder under `root` for a new project.
 #[tauri::command]
 pub fn new_project_dir(root: String, name: String) -> CmdResult<String> {
     let base = safe_folder_name(&name);
     let root = Path::new(&root);
-    let mut candidate = root.join(&base);
+    let mut candidate = root.join(format!("{base}.{MATICS_EXTENSION}"));
     let mut n = 2;
     while candidate.exists() {
-        candidate = root.join(format!("{base}-{n}"));
+        candidate = root.join(format!("{base}-{n}.{MATICS_EXTENSION}"));
         n += 1;
     }
     fs::create_dir_all(candidate.join(ASSETS_DIR)).map_err(err)?;
@@ -414,6 +426,22 @@ mod tests {
     }
 
     #[test]
+    fn only_matics_folders_are_projects() {
+        let root = std::env::temp_dir().join(format!("dm-list-{}", std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        let project = r#"{"id":"p1","name":"Listed"}"#;
+        let first = new_project_dir(root.to_string_lossy().into(), "Listed".into()).unwrap();
+        let second = new_project_dir(root.to_string_lossy().into(), "Listed".into()).unwrap();
+        assert!(first.ends_with("listed.matics") && second.ends_with("listed-2.matics"));
+        fs::write(Path::new(&first).join(PROJECT_FILE), project).unwrap();
+        fs::create_dir_all(root.join("plain")).unwrap();
+        fs::write(root.join("plain").join(PROJECT_FILE), project).unwrap();
+        let listed = list_projects(root.to_string_lossy().into()).unwrap();
+        assert_eq!(listed.iter().map(|e| e.dir.as_str()).collect::<Vec<_>>(), [first.as_str()]);
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
     fn asset_paths_stay_inside_the_project() {
         assert!(asset_rel_ok("assets/a.pdf"));
         assert!(!asset_rel_ok("../etc/passwd"));
@@ -442,11 +470,9 @@ mod tests {
     }
 }
 
-// Files the user picked in a native open or save panel for import and export. Limited to
-// the formats the app reads and writes, so these commands cannot touch anything else.
-const IMPORT_EXTENSIONS: &[&str] = &["json"];
-const EXPORT_EXTENSIONS: &[&str] = &["json", "pdf", "png", "svg"];
-const MAX_IMPORT_BYTES: u64 = 200 * 1024 * 1024;
+// Files the user picked in a native save panel for an export. Limited to the formats the
+// app writes, so this command cannot touch anything else.
+const EXPORT_EXTENSIONS: &[&str] = &["pdf", "png", "svg"];
 
 fn has_extension(path: &Path, allowed: &[&str]) -> bool {
     path.extension()
@@ -456,23 +482,10 @@ fn has_extension(path: &Path, allowed: &[&str]) -> bool {
 }
 
 #[tauri::command]
-pub fn read_import_file(path: String) -> CmdResult<String> {
-    let path = Path::new(&path);
-    if !has_extension(path, IMPORT_EXTENSIONS) {
-        return Err("Only .json files can be imported.".into());
-    }
-    let size = fs::metadata(path).map_err(err)?.len();
-    if size > MAX_IMPORT_BYTES {
-        return Err("That file is too large to import.".into());
-    }
-    fs::read_to_string(path).map_err(err)
-}
-
-#[tauri::command]
 pub fn write_export_file(path: String, base64_data: String) -> CmdResult<()> {
     let path = Path::new(&path);
     if !has_extension(path, EXPORT_EXTENSIONS) {
-        return Err("Exports are saved as .json, .pdf, .png or .svg.".into());
+        return Err("Exports are saved as .pdf, .png or .svg.".into());
     }
     let bytes = base64::engine::general_purpose::STANDARD.decode(base64_data).map_err(err)?;
     fs::write(path, bytes).map_err(err)

@@ -1,0 +1,24 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "bundle": {
+    "fileAssociations": [
+      {
+        "ext": ["matics"],
+        "name": "Matics Project",
+        "description": "Matics project",
+        "role": "Editor",
+        "contentTypes": ["ai.stout.matics.project"],
+        "exportedType": { "identifier": "ai.stout.matics.project", "conformsTo": ["com.apple.package"] }
+      },
+      {
+        "ext": ["matics"],
+        "name": "Compressed Matics Project",
+        "description": "Compressed Matics project",
+        "role": "Editor",
+        "mimeType": "application/x-matics",
+        "contentTypes": ["ai.stout.matics.compressed"],
+        "exportedType": { "identifier": "ai.stout.matics.compressed", "conformsTo": ["public.data"] }
+      }
+    ]
+  }
+}

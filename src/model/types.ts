@@ -406,20 +406,3 @@ export interface WorkspacePrefs {
   // When each project was last opened, as ISO strings.
   opened: Record<string, string>;
 }
-
-// Portable device catalogue ("products") for sharing presets between projects.
-export interface PresetLibraryFile {
-  kind: "diagram-maker-presets";
-  version: 1;
-  presets: DevicePreset[];
-  // Product documentation travels with the products.
-  notes: Note[];
-  documents: Document[];
-  docLinks: DocLink[];
-}
-
-export interface ProjectFile {
-  kind: "diagram-maker-project";
-  version: 1;
-  project: Project;
-}

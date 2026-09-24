@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Matics",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "ai.stout.diagram-maker",
   "build": {
     "frontendDist": "../dist",
@@ -47,12 +47,12 @@
     "fileAssociations": [
       {
         "ext": ["matics"],
-        "name": "Matics Package",
-        "description": "Matics project package",
+        "name": "Compressed Matics Project",
+        "description": "Compressed Matics project",
         "role": "Editor",
         "mimeType": "application/x-matics",
-        "contentTypes": ["ai.stout.matics.package"],
-        "exportedType": { "identifier": "ai.stout.matics.package", "conformsTo": ["public.data"] }
+        "contentTypes": ["ai.stout.matics.compressed"],
+        "exportedType": { "identifier": "ai.stout.matics.compressed", "conformsTo": ["public.data"] }
       }
     ]
   },

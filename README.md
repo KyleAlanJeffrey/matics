@@ -43,8 +43,8 @@ changes, the documentation changes with it.
   devices they describe.
 - **Report.** A printable summary of the whole system (schematic, parts list, networks,
   connections, frames and notes) as a PDF or PNG.
-- **Plain files.** A project is a folder with `project.json` and its attachments. Share
-  one as a single `.matics` package.
+- **One project format.** A project is a `.matics` folder with `project.json` and its
+  attachments. Send one as a single compressed `.matics` file.
 
 ## Download and install
 
@@ -83,11 +83,11 @@ package.
    **Documentation** (Cmd+2). Link datasheets, write notes and add services.
 5. **Describe the traffic.** In **Communications** (Cmd+3), import a DBC or `.proto`
    file, then set who sends and receives each message.
-6. **Share it.** **File > Package Project** (Cmd+Shift+S) writes one `.matics` file.
-   Double-click it on another machine to open the project there. **File > Export Report
-   as PDF** (Cmd+P) makes a printable copy.
+6. **Share it.** **File > Save Compressed Copy** (Cmd+Shift+S) writes the whole project
+   as one `.matics` file. Double-click it on another machine to open the project there.
+   **File > Export Report as PDF** (Cmd+P) makes a printable copy.
 
-Projects save automatically to `~/Documents/Matics/<project>/`.
+Projects save automatically to `~/Documents/Matics/<project>.matics/`.
 
 <p align="center">
   <img src="docs/images/documentation.png" alt="Documentation for a controller: its documents, connected devices and notes" width="900">
@@ -109,23 +109,27 @@ Projects save automatically to `~/Documents/Matics/<project>/`.
 | Copy / paste devices | Cmd+C / Cmd+V | Ctrl+C / Ctrl+V |
 | Select, pan, wire tools | V, H, W | V, H, W |
 | Save | Cmd+S | Ctrl+S |
-| Open a project folder / a `.matics` package | Cmd+O / Cmd+Shift+O | Ctrl+O / Ctrl+Shift+O |
-| Package the project | Cmd+Shift+S | Ctrl+Shift+S |
+| Open a project / a compressed project | Cmd+O / Cmd+Shift+O | Ctrl+O / Ctrl+Shift+O |
+| Save a compressed copy | Cmd+Shift+S | Ctrl+Shift+S |
 | Export the report as PDF | Cmd+P | Ctrl+P |
 
 ## Projects and files
 
-A project is a folder you can sync, copy or put in version control:
+Every project is stored the same way: a `.matics` folder you can sync, copy or put in
+version control. Finder shows it as a single document.
 
 ```
-~/Documents/Matics/<project>/
+~/Documents/Matics/<project>.matics/
   project.json   devices, wiring, networks, messages, notes and sketches
   assets/        device pictures and attached documents
 ```
 
-A `.matics` file is that folder zipped into one file. Opening one creates a new project
-next to your others, so it never overwrites work in progress. Existing folders open with
-**File > Open Project Folder**.
+**File > Open Project** (Cmd+O) opens a `.matics` folder from anywhere and edits it in
+place. A compressed `.matics` file is that folder zipped into one file, for sending or
+keeping a snapshot. Opening one (Cmd+Shift+O, or double-click it) unpacks it into a new
+project next to your others, so it never overwrites work in progress. The only other
+files Matics reads or writes are DBC and `.proto` imports, attachments, and report and
+sketch exports.
 
 ## Build from source
 
@@ -159,7 +163,7 @@ src/store       project store with undo; disk storage in the app, IndexedDB in t
 src/views       one folder per page: home, diagram, notes, communications, frames, sketches, report
 src/components  app shell and shared UI
 src/lib         desktop commands, assets, menus, file saving
-src-tauri       the desktop shell: window, macOS menu bar, project folders, packages, updates
+src-tauri       the desktop shell: window, macOS menu bar, project folders, compression, updates
 docs/           decisions, data model and development notes
 ```
 

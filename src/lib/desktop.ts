@@ -42,10 +42,9 @@ export const desktop = {
   copyAsset: (fromDir: string, toDir: string, rel: string) => invoke<void>("copy_asset", { fromDir, toDir, rel }),
   openAsset: (dir: string, rel: string) => invoke<void>("open_asset", { dir, rel }),
   fetchPdf: (url: string) => invoke<string>("fetch_pdf", { url }),
-  readImportFile: (path: string) => invoke<string>("read_import_file", { path }),
   writeExportFile: (path: string, base64Data: string) => invoke<void>("write_export_file", { path, base64Data }),
-  exportPackage: (dir: string, path: string) => invoke<void>("export_package", { dir, path }),
-  importPackage: (path: string, root: string) => invoke<string>("import_package", { path, root }),
+  compressProject: (dir: string, path: string) => invoke<void>("compress_project", { dir, path }),
+  openProjectPath: (path: string, root: string) => invoke<{ dir: string; unpacked: boolean }>("open_project_path", { path, root }),
   takeOpenedFiles: () => invoke<string[]>("take_opened_files"),
 
   pickFolder: (title: string) => openDialog({ directory: true, multiple: false, title }) as Promise<string | null>,

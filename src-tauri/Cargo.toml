@@ -1,6 +1,6 @@
 [package]
 name = "diagram-maker"
-version = "0.1.0"
+version = "0.2.0"
 description = "Matics: network and wiring diagrams with a documentation layer"
 authors = ["Stout"]
 license = ""
@@ -30,3 +30,6 @@ dirs = "6"
 trash = "5"
 ureq = "2"
 zip = { version = "4.2.0", default-features = false, features = ["deflate"] }
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+tauri-plugin-single-instance = "2"

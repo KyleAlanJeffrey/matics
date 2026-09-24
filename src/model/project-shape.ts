@@ -1,8 +1,8 @@
 import type { Project } from "./types";
 
 // Every collection a Project holds. Projects saved by older builds lack some of them, and
-// those are refused where they come in (import, open folder, open package) instead of
-// crashing whichever page reads the gap. src-tauri/src/package.rs checks the same list.
+// those are refused when they are opened instead of crashing whichever page reads the gap.
+// src-tauri/src/package.rs checks the same list for compressed projects.
 const RECORD_FIELDS = [
   "presets",
   "devices",

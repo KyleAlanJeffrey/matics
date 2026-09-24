@@ -76,7 +76,7 @@ removes it from its bundle; an emptied bundle disappears and its children become
 A `DiagramImage` is a picture dropped on the schematic (a machine photo, a mounting
 sketch). `src` takes the same forms as a preset's `imageUrl`: in the desktop app the file is
 copied into `assets/`, the browser dev build keeps a data URL (large photos are scaled to
-1600px), and JSON exports carry pictures inline. `position` and `size` are in flow pixels.
+1600px). `position` and `size` are in flow pixels.
 Pictures draw above zones and below wires and devices; they are not part of the connection
 report tables. Projects saved before pictures existed load with `images: {}`.
 
@@ -154,8 +154,8 @@ route redirects `/notes/<deviceId>` to `/notes/<presetId>`.
 `shared`. A document linked to more than one owner is shared; one with no links is
 unfiled. Wiki-links inside notes are `[[Name]]` text resolved by name to a preset, bus or
 document (`resolveWikiTarget`); renames rewrite them. Backlinks are computed by scanning
-notes, never stored. Product notes and preset documents travel with the product library on
-export.
+notes, never stored. Product notes and preset documents belong to the project; sharing products
+between projects is planned as a separate device library.
 
 ## Derived data (src/model/derived.ts)
 

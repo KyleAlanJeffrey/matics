@@ -19,27 +19,20 @@ import {
   type NoteContent,
   type PortRef,
   type Position,
-  type PresetLibraryFile,
   type ProtoMessage,
   type Sketch,
   type Project,
-  type ProjectFile,
   type WireBundle,
   type ProjectMeta,
   type WorkspacePrefs,
   type Zone,
 } from "@/model/types";
 import { sampleProject } from "@/model/sample-project";
-import { assertCompleteProject } from "@/model/project-shape";
 import { resolveWikiTarget } from "@/model/derived";
 import { renameWikiLinks } from "@/model/markdown";
 import { busGeometry, DEFAULT_BUS_LENGTH } from "@/views/diagram/to-flow";
 import { moveCorner, nearestOnPolyline, polylineFrom, polylineUntil } from "@/views/diagram/wire-geometry";
-import {
-  downloadJson,
-  readJsonFile,
-  safeFilename,
-} from "./persistence";
+import { safeFilename } from "./persistence";
 import { storage } from "./storage";
 import { desktop, fileName, isDesktop } from "@/lib/desktop";
 import { inlineAssets, isAssetRef } from "@/lib/assets";
@@ -134,17 +127,12 @@ interface ProjectState {
   deleteProject: (projectId: string) => Promise<void>;
   // Writes the project now instead of waiting for the autosave.
   saveNow: () => Promise<void>;
-  exportProject: () => Promise<void>;
-  importProject: (file: File) => Promise<void>;
-  exportLibrary: () => Promise<void>;
-  importLibrary: (file: File) => Promise<number>;
-  // Desktop only: open a project folder from anywhere, show the current one in Finder,
+  // Desktop only: open a .matics project from anywhere, show the current one in Finder,
   // copy a picked file into the project's assets folder.
-  openProjectFolder: () => Promise<void>;
+  // A .matics folder opens where it is; a compressed .matics file opens as a new project.
+  openProjectPath: (path: string) => Promise<void>;
   // The whole project folder, pictures and attached files included, as one .matics file.
-  packageProject: () => Promise<void>;
-  // Opens a .matics package as a new project; asks for the file when no path is given.
-  openPackage: (path?: string) => Promise<void>;
+  saveCompressedCopy: () => Promise<void>;
   revealProject: () => Promise<void>;
   pickAsset: (
     kind: "image" | "document",
@@ -501,66 +489,22 @@ export const useProjectStore = create<ProjectState>()(
         await flushPendingSave();
       },
 
-      exportProject: async () => {
-        flushBufferedEditors();
-        const project = await exportable(get().project, get().projectDir);
-        const file: ProjectFile = {
-          kind: "diagram-maker-project",
-          version: 1,
-          project,
-        };
-        await downloadJson(`${safeFilename(project.name)}.diagram.json`, file);
-      },
-
-      importProject: async (file) => {
-        const parsed = await readJsonFile<ProjectFile>(file);
-        if (parsed.kind !== "diagram-maker-project" || !parsed.project)
-          throw new Error("Not a diagram-maker project file");
-        assertCompleteProject(parsed.project, "That file");
-        const project = { ...parsed.project, id: newId("project") };
-        await adoptProject(project, set, get);
-      },
-
-      exportLibrary: async () => {
-        const project = await exportable(get().project, get().projectDir);
-        const file: PresetLibraryFile = {
-          kind: "diagram-maker-presets",
-          version: 1,
-          ...libraryOf(project),
-        };
-        await downloadJson(`${safeFilename(project.name)}.products.json`, file);
-      },
-
-      packageProject: async () => {
+      saveCompressedCopy: async () => {
         await get().saveNow();
-        if (get().saveError) throw new Error(`The project could not be saved, so it was not packaged: ${get().saveError}`);
+        if (get().saveError) throw new Error(`The project could not be saved, so no copy was made: ${get().saveError}`);
         const dir = get().projectDir;
-        if (!dir) throw new Error("This project has no folder to package yet.");
-        const name = `${safeFilename(get().project.name)}.${PACKAGE_EXTENSION}`;
-        const path = await desktop.pickSavePath("Package project", name, [PACKAGE_FILTER]);
-        if (path) await desktop.exportPackage(dir, path);
+        if (!dir) throw new Error("This project has no folder yet.");
+        const name = `${safeFilename(get().project.name)}.${MATICS_EXTENSION}`;
+        const path = await desktop.pickSavePath("Save compressed copy", name, [MATICS_FILTER]);
+        if (path) await desktop.compressProject(dir, path);
       },
 
-      openPackage: async (path) => {
-        if (!storage.openPackage) return;
-        const picked = path ?? (await desktop.pickFile("Open package", [PACKAGE_FILTER]));
-        if (!picked) return;
-        const opened = await storage.openPackage(picked);
-        set((state) => {
-          state.projects = [...state.projects, opened];
-        });
-        await get().switchProject(opened.id);
-      },
-
-      openProjectFolder: async () => {
-        if (!storage.openFolder) return;
-        const opened = await storage.openFolder();
-        if (!opened) return;
-        const known = get().projects.some((m) => m.id === opened.id);
-        if (!known) {
-          const index = [...get().projects, opened];
+      openProjectPath: async (path) => {
+        if (!storage.openPath) return;
+        const opened = await storage.openPath(path);
+        if (!get().projects.some((m) => m.id === opened.id)) {
           set((state) => {
-            state.projects = index;
+            state.projects = [...state.projects, opened];
           });
         }
         await get().switchProject(opened.id);
@@ -605,58 +549,6 @@ export const useProjectStore = create<ProjectState>()(
         if (!source) return null;
         const rel = await desktop.importAsset(dir, source);
         return { rel, name: fileName(source) };
-      },
-
-      importLibrary: async (file) => {
-        const parsed = await readJsonFile<PresetLibraryFile>(file);
-        if (
-          parsed.kind !== "diagram-maker-presets" ||
-          !Array.isArray(parsed.presets)
-        )
-          throw new Error("Not a diagram-maker product library");
-        let added = 0;
-        set((state) => {
-          // Same id and same name means the same product; refresh it. Otherwise keep both under a new id.
-          const idMap = new Map<string, string>();
-          for (const preset of parsed.presets) {
-            const existing = state.project.presets[preset.id];
-            const id =
-              existing && existing.name !== preset.name
-                ? newId("preset")
-                : preset.id;
-            idMap.set(preset.id, id);
-            state.project.presets[id] = { ...preset, id };
-            added += 1;
-          }
-          for (const note of parsed.notes) {
-            const id = idMap.get(note.entityId);
-            if (id)
-              state.project.notes[id] = { entityId: id, content: note.content };
-          }
-          for (const doc of parsed.documents) {
-            state.project.documents[doc.id] = {
-              ...doc,
-              presetId: doc.presetId
-                ? idMap.get(doc.presetId) ?? doc.presetId
-                : undefined,
-            };
-          }
-          for (const link of parsed.docLinks) {
-            const entityId = idMap.get(link.entityId);
-            if (!entityId || !state.project.documents[link.documentId])
-              continue;
-            const exists = state.project.docLinks.some(
-              (l) =>
-                l.documentId === link.documentId && l.entityId === entityId,
-            );
-            if (!exists)
-              state.project.docLinks.push({
-                documentId: link.documentId,
-                entityId,
-              });
-          }
-        });
-        return added;
       },
 
       addPreset: (preset) => {
@@ -1465,11 +1357,11 @@ function withDir(entry: ProjectMeta): ProjectMeta {
   return dir ? { ...entry, dir } : entry;
 }
 
-// Matches PACKAGE_EXTENSION in src-tauri/src/package.rs.
-const PACKAGE_EXTENSION = "matics";
-const PACKAGE_FILTER = { name: "Matics package", extensions: [PACKAGE_EXTENSION] };
+// Matches MATICS_EXTENSION in src-tauri/src/storage.rs.
+export const MATICS_EXTENSION = "matics";
+export const MATICS_FILTER = { name: "Matics project", extensions: [MATICS_EXTENSION] };
 
-// JSON that leaves the project folder carries its pictures inline.
+// The project with its pictures inline, so a copy can write them into its own folder.
 async function exportable(
   project: Project,
   dir: string | null,

@@ -4,20 +4,21 @@ import { useProjectStore } from "@/store/project-store";
 import { desktop, isDesktop } from "./desktop";
 import { reportErrors, useShowOpenedProject, type CommandId } from "./commands";
 
-// Runs the macOS menu bar's items and opens packages handed over by Finder. Windows and
-// Linux have no native menu; the header shows the in-app File menu instead.
+// Runs the macOS menu bar's items and opens projects the app was handed: double-clicked in
+// Finder, or named on the command line on Windows and Linux. Those two have no native menu;
+// the header shows the in-app File menu instead.
 export function useNativeMenu(run: (command: CommandId) => void) {
   const showOpened = useShowOpenedProject();
   useEffect(() => {
     if (!isDesktop()) return;
     const store = useProjectStore.getState;
 
-    // Packages double-clicked in Finder, including the one that launched the app.
+    // Including the project that launched the app.
     const openFiles = async () => {
       await store().load();
       await showOpened(async () => {
-        // One bad package should not keep the others from opening.
-        for (const path of await desktop.takeOpenedFiles()) await reportErrors(() => store().openPackage(path));
+        // One bad project should not keep the others from opening.
+        for (const path of await desktop.takeOpenedFiles()) await reportErrors(() => store().openProjectPath(path));
       });
     };
     void reportErrors(openFiles);
