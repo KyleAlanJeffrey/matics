@@ -37,6 +37,7 @@ import { Inspector } from "./Inspector";
 import { BUS_TAP_HANDLE, DEVICE_CARD_WIDTH, parsePortHandle, projectToFlow, type DiagramNode } from "./to-flow";
 import { resolveWireDrop, wireAt } from "./wire-hit";
 import { ConnectionPreview } from "./ConnectionPreview";
+import { useNodesMeasured } from "./nodes-measured";
 import { ImageNode, MIN_IMAGE_EDGE } from "./ImageNode";
 import { SCHEMATIC_IMAGE_TYPES, loadSchematicImage } from "@/lib/image";
 import { desktop, isDesktop } from "@/lib/desktop";
@@ -50,12 +51,30 @@ const IMAGE_MAX_HEIGHT = 360;
 
 type Tool = "select" | "pan" | "wire";
 
+const FIT_OPTIONS = { padding: 0.1 };
+
 export function DiagramView() {
+  // A fresh canvas per project, so opening another one frames it instead of keeping the
+  // last project's viewport.
+  const projectId = useProjectStore((s) => s.project.id);
   return (
-    <ReactFlowProvider>
+    <ReactFlowProvider key={projectId}>
       <DiagramCanvas />
     </ReactFlowProvider>
   );
+}
+
+// The schematic opens fitted to the screen.
+function FitWhenMeasured() {
+  const measured = useNodesMeasured();
+  const { fitView } = useReactFlow();
+  const fitted = useRef(false);
+  useEffect(() => {
+    if (!measured || fitted.current) return;
+    fitted.current = true;
+    void fitView(FIT_OPTIONS);
+  }, [measured, fitView]);
+  return null;
 }
 
 function DiagramCanvas() {
@@ -424,7 +443,7 @@ function DiagramCanvas() {
                 <Plus className="h-4 w-4" />
               </button>
             </div>
-            <ToolButton onClick={() => fitView({ padding: 0.1, duration: 300 })} title="Fit to view">
+            <ToolButton onClick={() => fitView({ ...FIT_OPTIONS, duration: 300 })} title="Fit to view">
               <Maximize className="h-4 w-4" /> Fit
             </ToolButton>
           </div>
@@ -470,8 +489,6 @@ function DiagramCanvas() {
             selectionMode={SelectionMode.Partial}
             snapToGrid={snap}
             snapGrid={[GRID, GRID]}
-            fitView
-            fitViewOptions={{ padding: 0.1 }}
             minZoom={0.15}
             maxZoom={2.5}
             connectionLineComponent={ConnectionPreview}
@@ -482,6 +499,7 @@ function DiagramCanvas() {
             <Background variant={BackgroundVariant.Dots} gap={GRID} size={1} color="#d3d4d0" />
             <FreeWireLayer selectedId={selectedId} onSelect={select} drawing={drawing} cursor={cursor} drawColor={PORT_COLORS[drawKind]} />
             <BundleLayer selectedId={selectedId} onSelect={select} />
+            <FitWhenMeasured />
           </ReactFlow>
 
           <Legend />

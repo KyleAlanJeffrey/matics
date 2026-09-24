@@ -116,6 +116,9 @@ the stack decision in `00-tech-stack.md`.
 - Image files dropped on the canvas become resizable `DiagramImage` nodes saved into
   `assets/`. `dragDropEnabled` is off in tauri.conf.json so HTML file drops reach the page.
 - Navigation: two-finger scroll pans, pinch or Cmd/Ctrl + wheel zooms.
+- The schematic opens fitted to the screen, once every node has a size (React Flow's
+  `fitView` prop frames whatever is measured first). Each project gets its own canvas, so
+  opening another one frames it too.
 - The inspector is read-only until Edit is pressed; removal buttons appear only while
   editing. The same rule holds for every inspector in the app.
 
