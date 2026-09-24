@@ -24,6 +24,7 @@ import {
   type PortRef,
   type Position,
   type ProtoMessage,
+  type Route,
   type Sketch,
   type Project,
   type WireBundle,
@@ -221,6 +222,10 @@ interface ProjectState {
   addNetMapping: (mapping: Omit<NetMapping, "id">) => string;
   updateNetMapping: (mappingId: string, patch: Partial<Omit<NetMapping, "id">>) => void;
   removeNetMapping: (mappingId: string) => void;
+  addRoute: (route: Omit<Route, "id">) => string;
+  updateRoute: (routeId: string, patch: Partial<Omit<Route, "id">>) => void;
+  // Messages that travelled on the route keep their own sender and receivers.
+  removeRoute: (routeId: string) => void;
 
   // Sketches sit outside the project undo history entirely (see keepSketches).
   addSketch: (name: string) => string;
@@ -1036,6 +1041,27 @@ export const useProjectStore = create<ProjectState>()(
         set((state) => {
           delete state.project.netMappings[mappingId];
           forgetEntity(state.project, mappingId);
+        }),
+
+      addRoute: (route) => {
+        const id = newId("route");
+        set((state) => {
+          state.project.routes[id] = { id, ...route };
+        });
+        return id;
+      },
+
+      updateRoute: (routeId, patch) =>
+        set((state) => {
+          const route = state.project.routes[routeId];
+          if (route) Object.assign(route, patch);
+        }),
+
+      removeRoute: (routeId) =>
+        set((state) => {
+          delete state.project.routes[routeId];
+          for (const message of Object.values(state.project.messages)) if (message.routeId === routeId) delete message.routeId;
+          forgetEntity(state.project, routeId);
         }),
 
       addSketch: (name) => {

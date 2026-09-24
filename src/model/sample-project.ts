@@ -1,4 +1,4 @@
-import type { CanFrame, Project, DevicePreset, DeviceInstance, DeviceService, Connection, IoDirection, IoKind, IoModule, IoSignal, NetInterface, NetMapping, ProtoMessage, ServiceEndpoint, WireBundle } from "./types";
+import type { CanFrame, Project, DevicePreset, DeviceInstance, DeviceService, Connection, IoDirection, IoKind, IoModule, IoSignal, NetInterface, NetMapping, ProtoMessage, Route, ServiceEndpoint, WireBundle } from "./types";
 import { sampleNotes } from "./sample-notes";
 
 // A fictional demo rover: a core of shared electronics and three identical drive modules.
@@ -257,6 +257,7 @@ const sampleMessages: Record<string, ProtoMessage> = {
     sender: { deviceId: "computer", serviceId: "navigation" },
     receivers: [{ deviceId: "modem", serviceId: "telemetry-uplink" }],
     transport: "MQTT :8883",
+    routeId: "route-telemetry",
   },
   "msg-drive-goal": {
     id: "msg-drive-goal",
@@ -271,7 +272,23 @@ const sampleMessages: Record<string, ProtoMessage> = {
     sender: { deviceId: "modem", serviceId: "telemetry-uplink" },
     receivers: [{ deviceId: "computer", serviceId: "drive-planner" }],
     transport: "MQTT :8883",
+    routeId: "route-telemetry",
   },
+};
+
+// One of each state: a built link, a planned proxy and a feed still missing its far end.
+const sampleRoutes: Record<string, Route> = {
+  "route-telemetry": { id: "route-telemetry", name: "Telemetry uplink", from: { deviceId: "computer" }, to: { deviceId: "modem", serviceId: "telemetry-uplink" }, protocol: "MQTT" },
+  "route-power-ui": {
+    id: "route-power-ui",
+    name: "Power UI proxy",
+    from: { deviceId: "computer", serviceId: "web-console" },
+    to: { deviceId: "power", serviceId: "power-web-ui" },
+    protocol: "HTTP",
+    path: "/power/*",
+    proposed: true,
+  },
+  "route-can-feed": { id: "route-can-feed", name: "CAN bridge feed", from: { deviceId: "modem", serviceId: "can-bridge" }, protocol: "UDP" },
 };
 
 // The power controller's I/O. A few mappings are left incomplete so Mapping review has work.
@@ -355,7 +372,7 @@ export const sampleProject: Project = {
   ioSignals: sampleIoSignals,
   netInterfaces: sampleNetInterfaces,
   netMappings: sampleNetMappings,
-  routes: {},
+  routes: sampleRoutes,
   documents: {
     "driver-manual": { id: "driver-manual", title: "MD-200 manual", kind: "pdf", scope: "preset", presetId: "driver", url: "https://example.com/docs/md-200-manual.pdf" },
     "encoder-wiring": { id: "encoder-wiring", title: "Encoder wiring notes", kind: "note", scope: "preset", presetId: "driver" },

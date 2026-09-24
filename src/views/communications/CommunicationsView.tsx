@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router";
-import { Database, FileCode2, Network, Plus, Search } from "lucide-react";
+import { Boxes, Database, FileCode2, Network, Plus, Search, Waypoints } from "lucide-react";
 import { useProject, useProjectStore } from "@/store/project-store";
 import { useSelection } from "@/lib/selection";
 import { communicationRows, type CommunicationRow } from "@/model/messages";
@@ -8,12 +8,23 @@ import { FramesView } from "@/views/frames/FramesView";
 import { IoImportButton } from "@/views/io/IoImportButton";
 import { ProtobufView } from "./ProtobufView";
 import { ModbusView, resolveInterface } from "./ModbusView";
+import { ConnectionsView } from "./ConnectionsView";
+import { ServicesView } from "./ServicesView";
 import { MessageTable } from "./MessageTable";
 import { ProtoImportButton } from "./ProtoImportButton";
 
-const TABS = ["all", "can", "protobuf", "modbus"] as const;
+const TABS = ["all", "can", "protobuf", "modbus", "connections", "services"] as const;
 type Tab = (typeof TABS)[number];
 type Kind = CommunicationRow["kind"];
+
+const ADD_LABELS: Record<Tab, string> = {
+  all: "Add message",
+  can: "Add frame",
+  protobuf: "Add message",
+  modbus: "Add mapping",
+  connections: "Add connection",
+  services: "Add service",
+};
 
 const KIND_LABELS: Record<Kind, string> = { can: "CAN", protobuf: "Protobuf", modbus: "Modbus" };
 
@@ -31,13 +42,15 @@ export function CommunicationsView() {
   const tabParam = params.get("tab") as Tab | null;
   const tab: Tab = tabParam && TABS.includes(tabParam) ? tabParam : "all";
   const { selectedId, select } = useSelection();
-  const { addMessage, addFrame, addNetMapping } = useProjectStore();
+  const { addMessage, addFrame, addNetMapping, addRoute } = useProjectStore();
+  const [addingService, setAddingService] = useState(false);
   const frameCount = Object.keys(project.frames).length;
   const messageCount = Object.keys(project.messages).length;
   const mappingCount = Object.keys(project.netMappings).length;
   const currentInterface = tab === "modbus" ? resolveInterface(project, params.get("interface"), selectedId) : undefined;
 
-  const setTab = (next: Tab, selected?: string) =>
+  const setTab = (next: Tab, selected?: string) => {
+    setAddingService(false);
     setParams(
       (prev) => {
         const out = new URLSearchParams(prev);
@@ -48,6 +61,7 @@ export function CommunicationsView() {
       },
       { replace: true },
     );
+  };
 
   const add = () => {
     if (tab === "can") {
@@ -56,6 +70,14 @@ export function CommunicationsView() {
     }
     if (tab === "modbus") {
       if (currentInterface) select(addNetMapping({ interfaceId: currentInterface.id, name: "New mapping", symbol: "", direction: "output" }));
+      return;
+    }
+    if (tab === "connections") {
+      select(addRoute({ name: "New connection", protocol: "" }));
+      return;
+    }
+    if (tab === "services") {
+      setAddingService(true);
       return;
     }
     setTab("protobuf", addMessage());
@@ -86,7 +108,7 @@ export function CommunicationsView() {
               }
             />
           ) : (
-            <ProtoImportButton onImported={() => setTab("protobuf")} />
+            tab !== "connections" && tab !== "services" && <ProtoImportButton onImported={() => setTab("protobuf")} />
           )}
           <button
             onClick={add}
@@ -94,7 +116,7 @@ export function CommunicationsView() {
             title={tab === "modbus" && !currentInterface ? "Add an interface first" : undefined}
             className="flex items-center gap-1.5 rounded-md bg-brand px-3.5 py-2 font-semibold text-charcoal hover:bg-brand-hover disabled:opacity-50"
           >
-            <Plus className="h-4 w-4" /> {tab === "can" ? "Add frame" : tab === "modbus" ? "Add mapping" : "Add message"}
+            <Plus className="h-4 w-4" /> {ADD_LABELS[tab]}
           </button>
         </div>
         <div className="mt-3 flex gap-1">
@@ -110,12 +132,20 @@ export function CommunicationsView() {
           <TabButton active={tab === "modbus"} onClick={() => setTab("modbus")} icon={<Database className="h-4 w-4 text-emerald-600" />}>
             Modbus {"\u00b7"} {mappingCount}
           </TabButton>
+          <TabButton active={tab === "connections"} onClick={() => setTab("connections")} icon={<Waypoints className="h-4 w-4 text-slate-500" />}>
+            Connections {"\u00b7"} {Object.keys(project.routes).length}
+          </TabButton>
+          <TabButton active={tab === "services"} onClick={() => setTab("services")} icon={<Boxes className="h-4 w-4 text-slate-500" />}>
+            Services
+          </TabButton>
         </div>
       </div>
       <div className="min-h-0 flex-1">
         {tab === "can" && <FramesView embedded />}
         {tab === "protobuf" && <ProtobufView />}
         {tab === "modbus" && <ModbusView />}
+        {tab === "connections" && <ConnectionsView />}
+        {tab === "services" && <ServicesView adding={addingService} onAdding={setAddingService} />}
         {tab === "all" && <AllCommunications onOpen={(row) => setTab(row.kind, row.id)} />}
       </div>
     </div>
