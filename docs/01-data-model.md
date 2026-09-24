@@ -144,7 +144,9 @@ which have no field side.
 channel has a dot (`"CPU".IF2.symbol`) are fieldbus interface mappings (see Network
 interfaces below); `ioMapInterfaces` groups them. Re-importing matches modules by device
 and name and signals by channel, updates the binding and keeps the field side, notes and
-documents. A signal's note and documents are keyed by its id. Removing a module removes
+documents. A channel bound to several variables (an input read into two) is one signal per
+variable; on re-import a signal pairs with its own variable first, so a renamed variable
+still updates the signal it belonged to. A signal's note and documents are keyed by its id. Removing a module removes
 its signals; removing a device removes its modules and interfaces and clears it as a
 field device or peer.
 
@@ -161,7 +163,9 @@ Mappings keep the order they were added in, which for an import is the file's or
 
 Importing an `IoMap.iom` matches interfaces by device, module and name and mappings by
 symbol; a match gets the new variable, direction and task and keeps its name, register,
-notes and documents. New mappings are named after their symbol (`pump_speed`
+notes and documents. An interface added by hand has no module, so the import takes it over
+when it is the only interface on the device with that name. A symbol bound to several
+variables pairs the same way as a channel. New mappings are named after their symbol (`pump_speed`
 reads "Pump speed"). Removing an interface removes its mappings and their notes
 and document links.
 

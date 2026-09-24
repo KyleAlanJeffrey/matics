@@ -135,6 +135,51 @@ describe("I/O", () => {
     expect(useProjectStore.getState().project.netMappings[mapping.id]).toMatchObject({ name: "Heartbeat to HMI", register: "40001", task: "Cyclic#2" });
   });
 
+  it("takes over a hand-added interface of the same name, unless two could be meant", () => {
+    const store = useProjectStore.getState();
+    const manual = store.addNetInterface({ deviceId: "power", name: "IF2", protocol: "Modbus" });
+    const level = { name: "Level", symbol: "level", direction: "input" as const, variable: "gNet.Level" };
+    expect(store.importIoMap("power", [], [{ module: "CPU", name: "IF2", mappings: [level] }])).toMatchObject({ interfaces: 0, mappingsAdded: 1 });
+    expect(useProjectStore.getState().project.netInterfaces[manual].module).toBe("CPU");
+
+    store.addNetInterface({ deviceId: "power", name: "IF3", protocol: "Modbus" });
+    store.addNetInterface({ deviceId: "power", name: "IF3", protocol: "Modbus" });
+    expect(store.importIoMap("power", [], [{ module: "CPU", name: "IF3", mappings: [] }])).toMatchObject({ interfaces: 1 });
+  });
+
+  it("keeps one mapping per variable when a symbol is read into two, across re-imports", () => {
+    const store = useProjectStore.getState();
+    const toHmi = { name: "Level", symbol: "level", direction: "input" as const, variable: "gHmi.Level" };
+    const toLog = { name: "Level", symbol: "level", direction: "input" as const, variable: "gLog.Level" };
+    expect(store.importIoMap("power", [], [{ module: "CPU", name: "IF2", mappings: [toHmi, toLog] }])).toMatchObject({ mappingsAdded: 2 });
+    const idOf = (variable: string) => Object.values(useProjectStore.getState().project.netMappings).find((m) => m.variable === variable)!.id;
+    const hmiId = idOf("gHmi.Level");
+    const logId = idOf("gLog.Level");
+
+    // The log variable was renamed, and now comes first in the file.
+    const again = store.importIoMap("power", [], [{ module: "CPU", name: "IF2", mappings: [{ ...toLog, variable: "gLog.TankLevel" }, toHmi] }]);
+    expect(again).toMatchObject({ mappingsAdded: 0, mappingsUpdated: 2 });
+    const mappings = useProjectStore.getState().project.netMappings;
+    expect(mappings[hmiId].variable).toBe("gHmi.Level");
+    expect(mappings[logId].variable).toBe("gLog.TankLevel");
+  });
+
+  it("keeps one signal per variable when a channel is read into two, across re-imports", () => {
+    const store = useProjectStore.getState();
+    const tank = { name: "TankLevel", channel: "AnalogInput01", kind: "ai" as const, direction: "input" as const, variable: "gIo.TankLevel", settings: [] };
+    const logged = { ...tank, name: "TankLevelLog", variable: "gLog.TankLevel" };
+    expect(store.importIoMap("power", [{ name: "AI-8", signals: [tank, logged] }], [])).toMatchObject({ added: 2 });
+    const idOf = (variable: string) => Object.values(useProjectStore.getState().project.ioSignals).find((s) => s.variable === variable)!.id;
+    const tankId = idOf("gIo.TankLevel");
+    const loggedId = idOf("gLog.TankLevel");
+
+    const again = store.importIoMap("power", [{ name: "AI-8", signals: [{ ...logged, variable: "gLog.Tank" }, tank] }], []);
+    expect(again).toMatchObject({ added: 0, updated: 2 });
+    const signals = useProjectStore.getState().project.ioSignals;
+    expect(signals[tankId].variable).toBe("gIo.TankLevel");
+    expect(signals[loggedId].variable).toBe("gLog.Tank");
+  });
+
   it("removes an interface with its mappings and their notes", () => {
     const store = useProjectStore.getState();
     const interfaceId = store.addNetInterface({ deviceId: "power", name: "IF1", protocol: "Modbus" });

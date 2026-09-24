@@ -211,8 +211,10 @@ interface ProjectState {
   removeIoSignal: (signalId: string) => void;
   // A parsed I/O mapping for one controller, in one undo step. Modules match by name and
   // signals by channel; a match gets the new binding and keeps its field device, pin,
-  // range and notes. Interfaces match by module and name and their mappings by symbol; a
-  // match keeps its name, register, peer and notes.
+  // range and notes. Interfaces match by module and name, or take over the one interface of
+  // that name added by hand, and their mappings by symbol; a match keeps its name,
+  // register, peer and notes. A channel or symbol bound to several variables keeps one
+  // record per variable.
   importIoMap: (deviceId: string, modules: ImportedModule[], interfaces: ImportedInterface[]) => IoMapImportResult;
   addNetInterface: (netInterface: Omit<NetInterface, "id">) => string;
   updateNetInterface: (interfaceId: string, patch: Partial<Omit<NetInterface, "id">>) => void;
@@ -367,6 +369,20 @@ function dropNetInterface(project: Project, interfaceId: string) {
 }
 
 // Inside a set() the project is an immer draft; this runs a set that undo will not record.
+// Pairs imported bindings with the records they update. A channel or symbol bound to
+// several variables keeps one record per variable, so records whose variable is unchanged
+// pair first; the rest pair in order, which lets a renamed variable update its record.
+function pairImported<R extends { variable?: string }, I extends { variable?: string }>(existing: R[], imported: I[], sameKey: (record: R, item: I) => boolean): (R | undefined)[] {
+  const claimed = new Set<R>();
+  const claim = (item: I, sameVariable: boolean) => {
+    const match = existing.find((r) => !claimed.has(r) && sameKey(r, item) && (!sameVariable || r.variable === item.variable));
+    if (match) claimed.add(match);
+    return match;
+  };
+  const exact = imported.map((item) => claim(item, true));
+  return exact.map((match, i) => match ?? claim(imported[i], false));
+}
+
 function withoutHistory(run: () => void) {
   const history = useProjectStore.temporal.getState();
   history.pause();
@@ -961,8 +977,9 @@ export const useProjectStore = create<ProjectState>()(
               result.modules++;
             }
             const existing = Object.values(project.ioSignals).filter((s) => s.moduleId === module.id);
-            for (const signal of imported.signals) {
-              const match = existing.find((s) => s.channel === signal.channel);
+            const matches = pairImported(existing, imported.signals, (s, signal) => s.channel === signal.channel);
+            imported.signals.forEach((signal, i) => {
+              const match = matches[i];
               if (match) {
                 // A renamed signal keeps its name while its variable stays the same.
                 if (match.variable !== signal.variable) match.name = signal.name;
@@ -973,18 +990,26 @@ export const useProjectStore = create<ProjectState>()(
                 project.ioSignals[id] = { id, moduleId: module.id, ...signal };
                 result.added++;
               }
-            }
+            });
           }
           for (const imported of interfaces) {
-            let netInterface = Object.values(project.netInterfaces).find((i) => i.deviceId === deviceId && i.module === imported.module && i.name === imported.name);
+            const named = Object.values(project.netInterfaces).filter((i) => i.deviceId === deviceId && i.name === imported.name);
+            let netInterface = named.find((i) => i.module === imported.module);
+            // One added by hand has no module. Take it over only when there is no doubt which.
+            const unscoped = named.filter((i) => !i.module);
+            if (!netInterface && unscoped.length === 1) {
+              netInterface = unscoped[0];
+              netInterface.module = imported.module;
+            }
             if (!netInterface) {
               const id = newId("netif");
               netInterface = project.netInterfaces[id] = { id, deviceId, module: imported.module, name: imported.name, protocol: "Modbus" };
               result.interfaces++;
             }
             const existing = Object.values(project.netMappings).filter((m) => m.interfaceId === netInterface.id);
-            for (const mapping of imported.mappings) {
-              const match = existing.find((m) => m.symbol === mapping.symbol);
+            const matches = pairImported(existing, imported.mappings, (m, mapping) => m.symbol === mapping.symbol);
+            imported.mappings.forEach((mapping, i) => {
+              const match = matches[i];
               if (match) {
                 Object.assign(match, { direction: mapping.direction, variable: mapping.variable, task: mapping.task });
                 result.mappingsUpdated++;
@@ -993,7 +1018,7 @@ export const useProjectStore = create<ProjectState>()(
                 project.netMappings[id] = { id, interfaceId: netInterface.id, ...mapping };
                 result.mappingsAdded++;
               }
-            }
+            });
           }
         });
         return result;
