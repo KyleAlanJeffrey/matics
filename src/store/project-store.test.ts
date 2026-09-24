@@ -105,4 +105,14 @@ describe("workspace prefs", () => {
     await expect(useProjectStore.getState().setStarred("some-project", true)).rejects.toThrow("disk full");
     expect(useProjectStore.getState().prefs.starred).toEqual([]);
   });
+
+  it("keeps a later change when an earlier one fails", async () => {
+    useProjectStore.setState({ prefs: { starred: [], archived: [], opened: {} } });
+    vi.spyOn(storage, "savePrefs").mockRejectedValueOnce(new Error("disk full")).mockResolvedValue();
+    const failed = useProjectStore.getState().setStarred("first", true);
+    const saved = useProjectStore.getState().setArchived("second", true);
+    await expect(failed).rejects.toThrow("disk full");
+    await saved;
+    expect(useProjectStore.getState().prefs).toMatchObject({ starred: [], archived: ["second"] });
+  });
 });

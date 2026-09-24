@@ -50,8 +50,10 @@ export function useSummaries(entries: ProjectMeta[]) {
         } catch (error) {
           summary = { kind: "broken", reason: error instanceof Error ? error.message : String(error) };
         }
+        // A newer run may already have cached a newer version of this project.
+        if (cancelled) return;
         cache.set(entry.id, { updatedAt: entry.updatedAt, summary });
-        if (!cancelled) arrived();
+        arrived();
       }
     })();
     return () => {

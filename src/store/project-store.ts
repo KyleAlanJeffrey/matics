@@ -1434,19 +1434,25 @@ export function prefKey(projectId: string) {
   return storage.dirOf(projectId) ?? projectId;
 }
 
+let prefsWrites: Promise<unknown> = Promise.resolve();
+
 // Undone in memory when it cannot be saved, so the home never shows a star that a restart
-// would lose.
-async function updatePrefs(set: Setter, get: () => ProjectState, change: (prefs: WorkspacePrefs) => void) {
-  const before = get().prefs;
-  set((state) => change(state.prefs));
-  try {
-    await storage.savePrefs(get().prefs);
-  } catch (error) {
-    set((state) => {
-      state.prefs = before;
-    });
-    throw error;
-  }
+// would lose. Updates run one at a time so undoing one cannot also undo a later one.
+function updatePrefs(set: Setter, get: () => ProjectState, change: (prefs: WorkspacePrefs) => void) {
+  const update = prefsWrites.then(async () => {
+    const before = get().prefs;
+    set((state) => change(state.prefs));
+    try {
+      await storage.savePrefs(get().prefs);
+    } catch (error) {
+      set((state) => {
+        state.prefs = before;
+      });
+      throw error;
+    }
+  });
+  prefsWrites = update.catch(() => {});
+  return update;
 }
 
 function toggled(keys: string[], key: string, on: boolean) {
