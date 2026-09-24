@@ -16,6 +16,13 @@ Project
   docLinks:     DocLink[]                   document <-> entity association
   notes:        Record<entityId, Note>      Markdown per product, bus or document
   frames:       Record<id, CanFrame>        CAN identifier ranges with sender and receivers
+  messages:     Record<id, ProtoMessage>    Protobuf message types with their routing
+  sketches:     Record<id, Sketch>          Excalidraw scenes
+  ioModules:    Record<id, IoModule>        I/O modules on a controller
+  ioSignals:    Record<id, IoSignal>        channel bindings on a module
+  netInterfaces: Record<id, NetInterface>   fieldbus interfaces such as Modbus (no UI yet)
+  netMappings:  Record<id, NetMapping>      symbols mapped on an interface (no UI yet)
+  routes:       Record<id, Route>           end-to-end connections (no UI yet)
 ```
 
 ## Ports
@@ -118,6 +125,31 @@ typed in: `name` (nested messages as `Outer.Inner`), the `schemaFile` it came fr
 and skips enums, services and options. Re-importing a file updates messages matched by
 name, schema file and package and keeps their routing. Removing a device or service clears it from
 message endpoints. A message's documents and note are keyed by its id.
+
+## I/O
+
+An `IoModule` (in `Project.ioModules`) is a module on a controller device: `deviceId`,
+`name` (the module name in the controller's I/O mapping, such as `IO-1`) and an optional
+`description`. An `IoSignal` (in `Project.ioSignals`) binds one channel of a module:
+`moduleId`, `name`, `channel` (`AnalogInput01`), `kind` (`ai`, `ao`, `di`, `do`, `pwm`,
+`encoder`, `other`), `direction`, and the optional PLC `variable` and `task` class
+(`Cyclic#5`, a class, not a duration). `settings` are other bindings that configure the
+same channel (a PWM period, current feedback), each with a `role`, `channel`, `direction`
+and optional `variable` and `task`; they are not separate wires. The field side is
+optional: `fieldDeviceId`, `pin` (a connector pin, never inferred from the channel name)
+and `range`. Kind `other` marks module-level bindings (module status, serial numbers),
+which have no field side.
+
+`src/model/io.ts` reads B&R `IoMap.iom` files (`parseIoMap`, `ioMapModules`). Lines whose
+channel has a dot (`"CPU".IF2.symbol`) are fieldbus interface mappings; the I/O import
+counts and skips them. Re-importing matches modules by device and name and signals by
+channel, updates the binding and keeps the field side, notes and documents. A signal's
+note and documents are keyed by its id. Removing a module removes its signals; removing a
+device removes its modules and interfaces and clears it as a field device or peer.
+
+`NetInterface`, `NetMapping` and `Route` are stored but not edited yet; the Communications
+page will use them for Modbus and end-to-end connections. Removing a device or service
+clears it from route ends.
 
 ## Sketches
 

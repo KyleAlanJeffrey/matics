@@ -39,6 +39,27 @@ export function messageTouches(message: ProtoMessage, deviceId: string, directio
   return sends || receives;
 }
 
+export interface DeviceMessages {
+  deviceId: string;
+  sent: ProtoMessage[];
+  received: ProtoMessage[];
+}
+
+// What each device sends and receives, in the project's device order, for devices on at
+// least one message. A device receiving through two of its services counts the message once.
+export function messagesByDevice(project: Project): DeviceMessages[] {
+  const byDevice = new Map<string, DeviceMessages>();
+  const entry = (deviceId: string) => {
+    if (!byDevice.has(deviceId)) byDevice.set(deviceId, { deviceId, sent: [], received: [] });
+    return byDevice.get(deviceId)!;
+  };
+  for (const message of Object.values(project.messages).sort((a, b) => a.name.localeCompare(b.name))) {
+    if (message.sender) entry(message.sender.deviceId).sent.push(message);
+    for (const deviceId of new Set(message.receivers.map((r) => r.deviceId))) entry(deviceId).received.push(message);
+  }
+  return Object.keys(project.devices).flatMap((id) => byDevice.get(id) ?? []);
+}
+
 // One row of the combined communications list: a CAN frame definition or a Protobuf message.
 export interface CommunicationRow {
   kind: "can" | "protobuf";

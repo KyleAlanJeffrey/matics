@@ -1,4 +1,4 @@
-import type { CanFrame, Project, DevicePreset, DeviceInstance, DeviceService, Connection, ProtoMessage, ServiceEndpoint, WireBundle } from "./types";
+import type { CanFrame, Project, DevicePreset, DeviceInstance, DeviceService, Connection, IoDirection, IoKind, IoModule, IoSignal, ProtoMessage, ServiceEndpoint, WireBundle } from "./types";
 import { sampleNotes } from "./sample-notes";
 
 // A fictional demo rover: a core of shared electronics and three identical drive modules.
@@ -274,6 +274,48 @@ const sampleMessages: Record<string, ProtoMessage> = {
   },
 };
 
+// The power controller's I/O. A few mappings are left incomplete so Mapping review has work.
+const sampleIoModules: Record<string, IoModule> = {
+  "io-local": { id: "io-local", deviceId: "power", name: "IO-1", description: "Local I/O" },
+  "io-analog": { id: "io-analog", deviceId: "power", name: "AI-4", description: "Analog expansion" },
+};
+
+type SignalRow = [string, string, string, IoKind, IoDirection, string, Partial<IoSignal>?];
+const signalRows: SignalRow[] = [
+  ["io-local", "BatteryVoltage", "AnalogInput01", "ai", "input", "Cyclic#5"],
+  ["io-local", "EStopPressed", "DigitalInput01", "di", "input", "Cyclic#1", { pin: "X3.1" }],
+  ["io-local", "DockContact", "DigitalInput02", "di", "input", "Cyclic#5", { fieldDeviceId: "dock", pin: "X3.2" }],
+  ["io-local", "FrontLights", "DigitalOutput01", "do", "output", "Cyclic#4", { fieldDeviceId: "front-lights", pin: "X2.1" }],
+  ["io-local", "MiddleLights", "DigitalOutput02", "do", "output", "Cyclic#4", { fieldDeviceId: "middle-lights", pin: "X2.2" }],
+  ["io-local", "RearLights", "DigitalOutput03", "do", "output", "Cyclic#4", { fieldDeviceId: "rear-lights" }],
+  [
+    "io-local",
+    "CoolingFan",
+    "PWMOutput05",
+    "pwm",
+    "output",
+    "Cyclic#1",
+    {
+      variable: "gIo.Outputs.CoolingFan.Output_INT32767",
+      settings: [
+        { role: "Period", channel: "PWMPeriod05", direction: "output", variable: "gIo.Outputs.CoolingFan.Period_us", task: "Cyclic#5" },
+        { role: "Feedback", channel: "Current05", direction: "input", variable: "gIo.Outputs.CoolingFan.Current_mA", task: "Cyclic#5" },
+      ],
+    },
+  ],
+  ["io-local", "ModuleOk", "ModuleOk", "other", "input", "Cyclic#6", { variable: "gIo.Inputs.Internal.ModuleOk" }],
+  ["io-analog", "MotorTemperature[0]", "AnalogInput01", "ai", "input", "Cyclic#5", { fieldDeviceId: "front-driver", pin: "X1.1", range: "-40 to 150 C" }],
+  ["io-analog", "MotorTemperature[1]", "AnalogInput02", "ai", "input", "Cyclic#5", { fieldDeviceId: "middle-driver", pin: "X1.2", range: "-40 to 150 C" }],
+  ["io-analog", "MotorTemperature[2]", "AnalogInput03", "ai", "input", "Cyclic#5", { fieldDeviceId: "rear-driver" }],
+];
+const sampleIoSignals: Record<string, IoSignal> = Object.fromEntries(
+  signalRows.map(([moduleId, name, channel, kind, direction, task, extra]) => {
+    const id = `signal-${moduleId}-${channel.toLowerCase()}`;
+    const variable = `gIo.${direction === "input" ? "Inputs" : "Outputs"}.${name}`;
+    return [id, { id, moduleId, name, channel, kind, direction, task, variable, settings: [], ...extra }];
+  }),
+);
+
 export const sampleProject: Project = {
   id: "demo-rover",
   name: "Demo Rover",
@@ -297,6 +339,11 @@ export const sampleProject: Project = {
   frames: sampleFrames,
   messages: sampleMessages,
   sketches: {},
+  ioModules: sampleIoModules,
+  ioSignals: sampleIoSignals,
+  netInterfaces: {},
+  netMappings: {},
+  routes: {},
   documents: {
     "driver-manual": { id: "driver-manual", title: "MD-200 manual", kind: "pdf", scope: "preset", presetId: "driver", url: "https://example.com/docs/md-200-manual.pdf" },
     "encoder-wiring": { id: "encoder-wiring", title: "Encoder wiring notes", kind: "note", scope: "preset", presetId: "driver" },

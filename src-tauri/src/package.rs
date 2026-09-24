@@ -16,8 +16,9 @@ const MAX_UNPACKED_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const MAX_PROJECT_BYTES: u64 = 200 * 1024 * 1024;
 // Every collection a project holds; compressed projects from older builds lack some and are
 // refused. src/model/project-shape.ts checks the same list for folders.
-const RECORD_FIELDS: [&str; 13] = [
+const RECORD_FIELDS: [&str; 18] = [
     "presets", "devices", "buses", "zones", "connections", "bundles", "freeWires", "images", "documents", "notes", "frames", "messages", "sketches",
+    "ioModules", "ioSignals", "netInterfaces", "netMappings", "routes",
 ];
 
 fn missing_fields(project: &serde_json::Value) -> Vec<&'static str> {
@@ -227,7 +228,7 @@ mod tests {
         assert_eq!(asset_file_name("other/x"), None);
     }
 
-    const COMPLETE_PROJECT: &str = r#"{"id":"p1","name":"Round trip","presets":{},"devices":{},"buses":{},"zones":{},"connections":{},"bundles":{},"freeWires":{},"images":{},"documents":{},"docLinks":[],"notes":{},"frames":{},"messages":{},"sketches":{}}"#;
+    const COMPLETE_PROJECT: &str = r#"{"id":"p1","name":"Round trip","presets":{},"devices":{},"buses":{},"zones":{},"connections":{},"bundles":{},"freeWires":{},"images":{},"documents":{},"docLinks":[],"notes":{},"frames":{},"messages":{},"sketches":{},"ioModules":{},"ioSignals":{},"netInterfaces":{},"netMappings":{},"routes":{}}"#;
 
     fn uncompress_error(name: &str, project_json: &str) -> String {
         let base = std::env::temp_dir().join(format!("dm-compressed-{name}-{}", std::process::id()));

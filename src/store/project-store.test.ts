@@ -96,6 +96,41 @@ describe("messages and sketches", () => {
   });
 });
 
+describe("I/O", () => {
+  beforeEach(() => {
+    useProjectStore.setState({ project: structuredClone(sampleProject) });
+  });
+
+  it("updates a re-imported channel's binding and keeps what was documented", () => {
+    const store = useProjectStore.getState();
+    store.updateIoSignal("signal-io-local-digitaloutput01", { name: "Front light bar" });
+    const result = store.importIoMap("power", [
+      {
+        name: "IO-1",
+        signals: [
+          { name: "FrontLights", channel: "DigitalOutput01", kind: "do", direction: "output", variable: "gIo.Outputs.FrontLights", task: "Cyclic#2", settings: [] },
+          { name: "HornOn", channel: "DigitalOutput04", kind: "do", direction: "output", variable: "gIo.Outputs.HornOn", settings: [] },
+        ],
+      },
+      { name: "DI-16", signals: [] },
+    ]);
+    expect(result).toEqual({ modules: 1, added: 1, updated: 1 });
+    const project = useProjectStore.getState().project;
+    expect(project.ioSignals["signal-io-local-digitaloutput01"]).toMatchObject({ name: "Front light bar", task: "Cyclic#2", fieldDeviceId: "front-lights", pin: "X2.1" });
+    expect(Object.values(project.ioSignals).find((s) => s.name === "HornOn")?.moduleId).toBe("io-local");
+  });
+
+  it("drops a removed controller's modules and unwires signals from a removed field device", () => {
+    const store = useProjectStore.getState();
+    store.removeDevice("front-lights");
+    expect(useProjectStore.getState().project.ioSignals["signal-io-local-digitaloutput01"].fieldDeviceId).toBeUndefined();
+    store.removeDevice("power");
+    const project = useProjectStore.getState().project;
+    expect(Object.keys(project.ioModules)).toEqual([]);
+    expect(Object.keys(project.ioSignals)).toEqual([]);
+  });
+});
+
 describe("workspace prefs", () => {
   afterEach(() => vi.restoreAllMocks());
 

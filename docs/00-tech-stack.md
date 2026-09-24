@@ -30,7 +30,7 @@ felt fragmented.
 | State | Zustand + Immer, `zundo` for undo | One normalized store feeds all views. |
 | Shell | Tauri 2 | Native window over the Vite build. Rust commands own the filesystem. |
 | Persistence | Project folders on disk | `project.json` + `assets/`. `idb-keyval` remains as the browser dev fallback. |
-| Routing | `react-router` | `/schematic`, `/notes/:owner?doc=`, `/communications`, `/sketches`, `/report`. Cross-view actions are navigations. |
+| Routing | `react-router` | `/schematic`, `/notes/:owner?doc=`, `/io`, `/communications`, `/sketches`, `/report`. Cross-view actions are navigations. |
 | Tests | Vitest | Model and derived-data logic. |
 
 ## Alternatives considered

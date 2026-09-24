@@ -4,6 +4,7 @@ import {
   ArchiveRestore,
   ArrowRight,
   Clock,
+  Cpu,
   FileText,
   Folder,
   FolderOpen,
@@ -140,6 +141,7 @@ function ProjectActions({ entry }: { entry: HomeEntry }) {
 const PAGES = [
   { to: "/schematic", label: "Diagram", icon: Workflow },
   { to: "/notes", label: "Documentation", icon: FileText },
+  { to: "/io", label: "I/O", icon: Cpu },
   { to: "/communications", label: "Communications", icon: MessagesSquare },
   { to: "/sketches", label: "Sketches", icon: Pencil },
 ];

@@ -15,6 +15,8 @@ import {
   type Document,
   type DocumentKind,
   type FreeWire,
+  type IoModule,
+  type IoSignal,
   type Note,
   type NoteContent,
   type PortRef,
@@ -28,6 +30,7 @@ import {
   type Zone,
 } from "@/model/types";
 import { sampleProject } from "@/model/sample-project";
+import type { ImportedModule } from "@/model/io";
 import { resolveWikiTarget } from "@/model/derived";
 import { renameWikiLinks } from "@/model/markdown";
 import { busGeometry, DEFAULT_BUS_LENGTH } from "@/views/diagram/to-flow";
@@ -95,6 +98,11 @@ function emptyProject(name: string, library: Library): Project {
     frames: {},
     messages: {},
     sketches: {},
+    ioModules: {},
+    ioSignals: {},
+    netInterfaces: {},
+    netMappings: {},
+    routes: {},
   };
 }
 
@@ -181,6 +189,18 @@ interface ProjectState {
   importMessages: (messages: Omit<ProtoMessage, "id" | "receivers">[]) => { added: number; updated: number };
   updateMessage: (messageId: string, patch: Partial<Omit<ProtoMessage, "id">>) => void;
   removeMessage: (messageId: string) => void;
+
+  addIoModule: (module: Omit<IoModule, "id">) => string;
+  updateIoModule: (moduleId: string, patch: Partial<Omit<IoModule, "id">>) => void;
+  // Removes the module's signals with it.
+  removeIoModule: (moduleId: string) => void;
+  addIoSignal: (signal: Omit<IoSignal, "id">) => string;
+  updateIoSignal: (signalId: string, patch: Partial<Omit<IoSignal, "id">>) => void;
+  removeIoSignal: (signalId: string) => void;
+  // A parsed I/O mapping for one controller, in one undo step. Modules match by name and
+  // signals by channel; a match gets the new binding and keeps its field device, pin,
+  // range and notes.
+  importIoMap: (deviceId: string, modules: ImportedModule[]) => { modules: number; added: number; updated: number };
 
   // Sketches sit outside the project undo history entirely (see keepSketches).
   addSketch: (name: string) => string;
@@ -274,7 +294,7 @@ function forgetEntity(project: Project, entityId: string) {
   project.docLinks = project.docLinks.filter((link) => link.entityId !== entityId);
 }
 
-// A removed device or service leaves messages routed to it without that end.
+// A removed device or service leaves messages and routes to it without that end.
 function forgetEndpoint(project: Project, deviceId: string, serviceId?: string) {
   const matches = (end: { deviceId: string; serviceId?: string } | undefined) =>
     !!end && end.deviceId === deviceId && (!serviceId || end.serviceId === serviceId);
@@ -286,6 +306,36 @@ function forgetEndpoint(project: Project, deviceId: string, serviceId?: string) 
       if (matches(message.sender)) delete message.sender;
       message.receivers = message.receivers.filter((r) => !matches(r));
     }
+  }
+  for (const route of Object.values(project.routes)) {
+    for (const end of ["from", "to"] as const) {
+      if (!matches(route[end])) continue;
+      if (serviceId) delete route[end]!.serviceId;
+      else delete route[end];
+    }
+  }
+}
+
+function dropIoModule(project: Project, moduleId: string) {
+  for (const signal of Object.values(project.ioSignals)) {
+    if (signal.moduleId !== moduleId) continue;
+    delete project.ioSignals[signal.id];
+    forgetEntity(project, signal.id);
+  }
+  delete project.ioModules[moduleId];
+  forgetEntity(project, moduleId);
+}
+
+// A removed device takes its modules and interfaces with it, and leaves no signal wired to it.
+function forgetIoDevice(project: Project, deviceId: string) {
+  for (const module of Object.values(project.ioModules)) if (module.deviceId === deviceId) dropIoModule(project, module.id);
+  for (const signal of Object.values(project.ioSignals)) if (signal.fieldDeviceId === deviceId) delete signal.fieldDeviceId;
+  for (const netInterface of Object.values(project.netInterfaces)) {
+    if (netInterface.peerDeviceId === deviceId) delete netInterface.peerDeviceId;
+    if (netInterface.deviceId !== deviceId) continue;
+    for (const mapping of Object.values(project.netMappings)) if (mapping.interfaceId === netInterface.id) delete project.netMappings[mapping.id];
+    delete project.netInterfaces[netInterface.id];
+    forgetEntity(project, netInterface.id);
   }
 }
 
@@ -620,6 +670,7 @@ export const useProjectStore = create<ProjectState>()(
           }
           for (const service of state.project.devices[deviceId]?.services ?? []) forgetEntity(state.project, service.id);
           forgetEndpoint(state.project, deviceId);
+          forgetIoDevice(state.project, deviceId);
           delete state.project.devices[deviceId];
           state.project.docLinks = state.project.docLinks.filter(
             (link) => link.entityId !== deviceId,
@@ -831,6 +882,75 @@ export const useProjectStore = create<ProjectState>()(
           delete state.project.messages[messageId];
           forgetEntity(state.project, messageId);
         }),
+
+      addIoModule: (module) => {
+        const id = newId("iomod");
+        set((state) => {
+          state.project.ioModules[id] = { id, ...module };
+        });
+        return id;
+      },
+
+      updateIoModule: (moduleId, patch) =>
+        set((state) => {
+          const module = state.project.ioModules[moduleId];
+          if (module) Object.assign(module, patch);
+        }),
+
+      removeIoModule: (moduleId) =>
+        set((state) => {
+          dropIoModule(state.project, moduleId);
+        }),
+
+      addIoSignal: (signal) => {
+        const id = newId("signal");
+        set((state) => {
+          state.project.ioSignals[id] = { id, ...signal };
+        });
+        return id;
+      },
+
+      updateIoSignal: (signalId, patch) =>
+        set((state) => {
+          const signal = state.project.ioSignals[signalId];
+          if (signal) Object.assign(signal, patch);
+        }),
+
+      removeIoSignal: (signalId) =>
+        set((state) => {
+          delete state.project.ioSignals[signalId];
+          forgetEntity(state.project, signalId);
+        }),
+
+      importIoMap: (deviceId, modules) => {
+        const result = { modules: 0, added: 0, updated: 0 };
+        set((state) => {
+          const project = state.project;
+          for (const imported of modules) {
+            let module = Object.values(project.ioModules).find((m) => m.deviceId === deviceId && m.name === imported.name);
+            if (!module) {
+              const id = newId("iomod");
+              module = project.ioModules[id] = { id, deviceId, name: imported.name };
+              result.modules++;
+            }
+            const existing = Object.values(project.ioSignals).filter((s) => s.moduleId === module.id);
+            for (const signal of imported.signals) {
+              const match = existing.find((s) => s.channel === signal.channel);
+              if (match) {
+                // A renamed signal keeps its name while its variable stays the same.
+                if (match.variable !== signal.variable) match.name = signal.name;
+                Object.assign(match, { kind: signal.kind, direction: signal.direction, variable: signal.variable, task: signal.task, settings: signal.settings });
+                result.updated++;
+              } else {
+                const id = newId("signal");
+                project.ioSignals[id] = { id, moduleId: module.id, ...signal };
+                result.added++;
+              }
+            }
+          }
+        });
+        return result;
+      },
 
       addSketch: (name) => {
         const id = newId("sketch");

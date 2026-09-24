@@ -22,6 +22,7 @@ export type CommandId =
   | "view:home"
   | "view:schematic"
   | "view:documentation"
+  | "view:io"
   | "view:communications"
   | "view:sketches"
   | "view:report";
@@ -31,6 +32,7 @@ export const HOME_PATH = "/";
 const PAGES: Partial<Record<CommandId, string>> = {
   "view:home": HOME_PATH,
   "view:schematic": "/schematic",
+  "view:io": "/io",
   "view:communications": "/communications",
   "view:sketches": "/sketches",
   "view:documentation": "/notes",
@@ -51,9 +53,10 @@ const SHORTCUTS: { key: string; shift?: boolean; command: CommandId }[] = [
   { key: "0", command: "view:home" },
   { key: "1", command: "view:schematic" },
   { key: "2", command: "view:documentation" },
-  { key: "3", command: "view:communications" },
-  { key: "4", command: "view:sketches" },
-  { key: "5", command: "view:report" },
+  { key: "3", command: "view:io" },
+  { key: "4", command: "view:communications" },
+  { key: "5", command: "view:sketches" },
+  { key: "6", command: "view:report" },
 ];
 
 export function shortcutFor(command: CommandId) {

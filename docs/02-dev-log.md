@@ -6,7 +6,7 @@ the stack decision in `00-tech-stack.md`.
 ## App shell
 
 - Pages: the project home (`/`), then the open project's Diagram (`/schematic`),
-  Documentation (`/notes`), Communications (`/communications`), Sketches (`/sketches`) and
+  Documentation (`/notes`), I/O (`/io`), Communications (`/communications`), Sketches (`/sketches`) and
   Report (`/report`). Selection lives in the URL (`?selected=id`), so moving between pages
   keeps it.
 - The app starts on the project home (`src/views/home`). The store still loads the last
@@ -22,7 +22,7 @@ the stack decision in `00-tech-stack.md`.
   native menu bar (`src-tauri/src/menu.rs`) emits a "menu" event that
   `src/lib/native-menu.ts` passes on. Windows, Linux and the browser build show the in-app
   File menu in the header (`FileMenu.tsx`) instead, and on the desktop the page handles
-  the menu shortcuts itself (Ctrl+N, Ctrl+O, Ctrl+1 to Ctrl+5 ...). A window menu there
+  the menu shortcuts itself (Ctrl+N, Ctrl+O, Ctrl+1 to Ctrl+6 ...). A window menu there
   would stack a second bar between the title bar and the header. On macOS, Edit and Window
   are the platform's own items so text fields keep copy, paste and undo. WKWebView offers
   key equivalents to the page first, so the page's Cmd+S and Cmd+Z handlers still run
@@ -116,8 +116,12 @@ the stack decision in `00-tech-stack.md`.
 - Image files dropped on the canvas become resizable `DiagramImage` nodes saved into
   `assets/`. `dragDropEnabled` is off in tauri.conf.json so HTML file drops reach the page.
 - Navigation: two-finger scroll pans, pinch or Cmd/Ctrl + wheel zooms.
+- The schematic opens fitted to the screen, once every node has a size (React Flow's
+  `fitView` prop frames whatever is measured first). Each project gets its own canvas, so
+  opening another one frames it too.
 - The inspector is read-only until Edit is pressed; removal buttons appear only while
-  editing. The same rule holds for every inspector in the app.
+  editing. The Communications editors (CAN frames and Protobuf messages) are the
+  exception: every property there is edited in place.
 
 ## Documentation
 
@@ -136,6 +140,18 @@ the stack decision in `00-tech-stack.md`.
 - Devices carry services (software on each placed copy, with an optional TCP or UDP port).
   Each service has its own documentation page.
 
+## I/O
+
+- Signals, Modules and Mapping review tabs (`?tab=`), scoped to a controller or module
+  from the hardware tree (`?controller=`, `?module=`). The selected signal is `?selected=`
+  and opens the inspector, where every field edits in place; "Map signal" opens a form
+  instead, guessing type and direction from the channel name until they are set.
+- Import reads an `IoMap.iom` in the page and asks which controller it belongs to,
+  preferring a device named after a module in the file. A channel's settings (PWM period,
+  current feedback) are attached to the output channel with the same number.
+- The review lists physical channels missing a field device, pin or (for analog
+  channels) range. Missing documentation is not reported as a wrong mapping.
+
 ## Communications
 
 - All, CAN and Protobuf tabs. CAN frames (`Project.frames`, `src/model/frames.ts`) are
@@ -145,7 +161,11 @@ the stack decision in `00-tech-stack.md`.
   comments. Nodes are matched to devices by name (`matchNode`) in an import dialog.
 - Protobuf messages come from `.proto` files (`src/model/proto.ts`) and get a sender and
   receivers (device plus service), a transport (suggested from the sender service's port),
-  fields, documents and a note.
+  fields, documents and a note. Each end is a device select plus a service select
+  ("Any service" when it can be any); receivers are rows you add and remove. A field's
+  type box takes `repeated <type>` as in the schema. As on the CAN tab, the sidebar
+  lists devices with their sent and received counts (`messagesByDevice`) and filters
+  on click, and "By device" shows each device's messages split into sends and receives.
 
 ## Sketches
 

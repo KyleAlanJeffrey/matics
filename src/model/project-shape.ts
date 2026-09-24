@@ -17,6 +17,11 @@ const RECORD_FIELDS = [
   "frames",
   "messages",
   "sketches",
+  "ioModules",
+  "ioSignals",
+  "netInterfaces",
+  "netMappings",
+  "routes",
 ] as const;
 
 function isRecord(value: unknown) {

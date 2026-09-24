@@ -296,6 +296,86 @@ export interface ProtoMessage {
   transport?: string;
 }
 
+// Physical I/O: named signals bound to the hardware channels of a controller's modules.
+// Channels are known only through their bindings, so a module lists no capacity of its own.
+export type IoKind = "ai" | "ao" | "di" | "do" | "pwm" | "encoder" | "other";
+export type IoDirection = "input" | "output";
+
+// A block of channels on a controller: its local I/O or an expansion module.
+export interface IoModule {
+  id: string;
+  // The placed device the module belongs to.
+  deviceId: string;
+  name: string;
+  description?: string;
+}
+
+// A binding that configures a channel rather than wiring to it, such as a PWM output's
+// period or its current feedback.
+export interface IoSetting {
+  role: string;
+  channel: string;
+  direction: IoDirection;
+  variable?: string;
+  task?: string;
+}
+
+export interface IoSignal {
+  id: string;
+  moduleId: string;
+  name: string;
+  // The channel as the controller names it, e.g. "AnalogInput01". Not a connector pin.
+  channel: string;
+  // "other" is a binding to the module itself, such as its status, not a physical channel.
+  kind: IoKind;
+  direction: IoDirection;
+  // The PLC variable bound to the channel, e.g. "gIo.Inputs.BatteryVoltage".
+  variable?: string;
+  // Task class as the controller names it, e.g. "Cyclic#5". Not a duration.
+  task?: string;
+  settings: IoSetting[];
+  // The placed device on the field side of the channel.
+  fieldDeviceId?: string;
+  pin?: string;
+  range?: string;
+}
+
+// A controller's network interface that carries symbolic data mappings, e.g. IF2 / Modbus.
+export interface NetInterface {
+  id: string;
+  deviceId: string;
+  name: string;
+  protocol: string;
+  peerDeviceId?: string;
+  transport?: string;
+  unitId?: string;
+}
+
+// One PLC variable exchanged over a NetInterface under a symbolic name.
+export interface NetMapping {
+  id: string;
+  interfaceId: string;
+  name: string;
+  symbol: string;
+  direction: IoDirection;
+  variable?: string;
+  task?: string;
+  register?: string;
+}
+
+// Who talks to whom and how, independent of what the payload looks like: an MQTT link
+// between two services, a proxy route. Messages name the route they travel on.
+export interface Route {
+  id: string;
+  name: string;
+  from?: MessageEndpoint;
+  to?: MessageEndpoint;
+  protocol: string;
+  path?: string;
+  // Planned but not yet built; shown apart from the defined routes.
+  proposed?: boolean;
+}
+
 // A freeform Excalidraw drawing. Elements and files are Excalidraw's own JSON, kept as-is.
 export interface Sketch {
   id: string;
@@ -326,6 +406,11 @@ export interface Project {
   frames: Record<string, CanFrame>;
   messages: Record<string, ProtoMessage>;
   sketches: Record<string, Sketch>;
+  ioModules: Record<string, IoModule>;
+  ioSignals: Record<string, IoSignal>;
+  netInterfaces: Record<string, NetInterface>;
+  netMappings: Record<string, NetMapping>;
+  routes: Record<string, Route>;
 }
 
 export type EntityKind = "device" | "preset" | "bus" | "zone" | "document";

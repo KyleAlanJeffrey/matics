@@ -36,6 +36,9 @@ changes, the documentation changes with it.
 - **Documentation.** A page for every device, network and service: linked PDFs and web
   pages, a markdown editor with `[[wiki-links]]`, backlinks and checklists. One document
   can be shared by several devices.
+- **I/O.** The controller's hardware channels and the signals bound to them, read from a
+  B&R `IoMap.iom` file or mapped by hand. Record the field device, connector pin and
+  electrical range of each channel, and review what is still missing.
 - **Communications.** CAN frame allocations (read from DBC files or entered by hand) and
   Protobuf messages imported from `.proto` files, each with its sender, receivers and
   transport.
@@ -81,8 +84,9 @@ package.
    from a port tab on a card to a bus or to another port.
 4. **Document as you go.** Select a device and open **Details**, or switch to
    **Documentation** (Cmd+2). Attach PDFs, link datasheets, write notes and add services.
-5. **Describe the traffic.** In **Communications** (Cmd+3), import a DBC or `.proto`
-   file, then set who sends and receives each message.
+5. **Describe the traffic.** In **I/O** (Cmd+3), import an `IoMap.iom` or map channels
+   by hand. In **Communications** (Cmd+4), import a DBC or `.proto` file, then set who
+   sends and receives each message.
 6. **Share it.** **File > Save Compressed Copy** (Cmd+Shift+S) writes the whole project
    as one `.matics` file. Double-click it on another machine to open the project there.
    **File > Export Report as PDF** (Cmd+P) makes a printable copy.
@@ -103,7 +107,7 @@ Projects save automatically to `~/Documents/Matics/<project>.matics/`.
 | --- | --- | --- |
 | New diagram | Cmd+N | Ctrl+N |
 | All projects (the project home) | Cmd+0 | Ctrl+0 |
-| Diagram, Documentation, Communications, Sketches, Report | Cmd+1 to Cmd+5 | Ctrl+1 to Ctrl+5 |
+| Diagram, Documentation, I/O, Communications, Sketches, Report | Cmd+1 to Cmd+6 | Ctrl+1 to Ctrl+6 |
 | Search documentation | Cmd+K | Ctrl+K |
 | Undo / redo | Cmd+Z / Cmd+Shift+Z | Ctrl+Z / Ctrl+Shift+Z |
 | Copy / paste devices | Cmd+C / Cmd+V | Ctrl+C / Ctrl+V |
