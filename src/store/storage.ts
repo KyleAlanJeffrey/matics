@@ -79,6 +79,7 @@ class DesktopStorage implements ProjectStorage {
     const dir = this.dirs.get(id);
     if (!dir) return undefined;
     const raw = await desktop.readProject(dir);
+    assertCompleteProject(raw, typeof raw.name === "string" ? `"${raw.name}"` : dir);
     const project = await materializeAssets(raw, dir, this.materialized);
     if (JSON.stringify(project) !== JSON.stringify(raw)) {
       try {

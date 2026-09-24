@@ -37,6 +37,20 @@ function useTrafficLightInset() {
   return inset;
 }
 
+// Autosave waits a moment after each edit, so every way of closing the window (the close
+// button, Alt+F4, Cmd+W, the taskbar) saves first, and asks before dropping a failed save.
+function useSaveBeforeClose() {
+  useEffect(() => {
+    if (!isDesktop()) return;
+    const unlisten = getCurrentWindow().onCloseRequested(async (event) => {
+      await useProjectStore.getState().saveNow();
+      const error = useProjectStore.getState().saveError;
+      if (error && !window.confirm(`Your latest changes could not be saved (${error}). Close anyway?`)) event.preventDefault();
+    });
+    return () => void unlisten.then((stop) => stop());
+  }, []);
+}
+
 // Windows fits two more things in the header (the File menu and the window buttons), so
 // its labels stay short up to a wider window. Class names are written out for Tailwind.
 function wideOnly() {
@@ -72,6 +86,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   useNativeMenu(run);
   useCommandShortcuts(run);
   useEffect(watchForUpdates, []);
+  useSaveBeforeClose();
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

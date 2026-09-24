@@ -29,6 +29,7 @@ export function missingProjectFields(value: unknown): string[] {
   const missing: string[] = RECORD_FIELDS.filter((field) => !isRecord(project[field]));
   if (!Array.isArray(project.docLinks)) missing.push("docLinks");
   if (typeof project.id !== "string") missing.push("id");
+  if (typeof project.name !== "string") missing.push("name");
   return missing;
 }
 

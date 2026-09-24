@@ -15,6 +15,8 @@ describe("missingProjectFields", () => {
 
   it("checks the shape, not just the key", () => {
     expect(missingProjectFields({ ...structuredClone(sampleProject), docLinks: {}, frames: [] })).toEqual(["frames", "docLinks"]);
+    const { name: _name, ...unnamed } = structuredClone(sampleProject);
+    expect(missingProjectFields(unnamed)).toEqual(["name"]);
     expect(missingProjectFields(null)).toEqual(["everything"]);
   });
 });

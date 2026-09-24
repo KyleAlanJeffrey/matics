@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Copy, Minus, Square, X } from "lucide-react";
-import { useProjectStore } from "@/store/project-store";
 
 const BUTTON = "flex h-full w-12 items-center justify-center text-white/80 hover:text-white";
 
@@ -17,12 +16,6 @@ export function WindowControls() {
     return () => void unlisten.then((stop) => stop());
   }, []);
 
-  const close = async () => {
-    // Autosave waits a moment after each edit; closing must not drop the last one.
-    await useProjectStore.getState().saveNow();
-    await getCurrentWindow().close();
-  };
-
   return (
     <div className="ml-2 flex h-full">
       <button className={`${BUTTON} hover:bg-white/10`} onClick={() => void getCurrentWindow().minimize()} title="Minimize">
@@ -31,7 +24,7 @@ export function WindowControls() {
       <button className={`${BUTTON} hover:bg-white/10`} onClick={() => void getCurrentWindow().toggleMaximize()} title={maximized ? "Restore" : "Maximize"}>
         {maximized ? <Copy className="h-3.5 w-3.5 -scale-x-100" strokeWidth={1.5} /> : <Square className="h-3.5 w-3.5" strokeWidth={1.5} />}
       </button>
-      <button className={`${BUTTON} hover:bg-[#c42b1c]`} onClick={() => void close()} title="Close">
+      <button className={`${BUTTON} hover:bg-[#c42b1c]`} onClick={() => void getCurrentWindow().close()} title="Close">
         <X className="h-4 w-4" strokeWidth={1.5} />
       </button>
     </div>

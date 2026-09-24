@@ -25,6 +25,9 @@ fn missing_fields(project: &serde_json::Value) -> Vec<&'static str> {
     if !project.get("docLinks").is_some_and(|v| v.is_array()) {
         missing.push("docLinks");
     }
+    if !project.get("name").is_some_and(|v| v.is_string()) {
+        missing.push("name");
+    }
     missing
 }
 
@@ -101,7 +104,7 @@ pub fn import_package(path: String, root: String) -> CmdResult<String> {
     }
     let project: serde_json::Value = serde_json::from_str(&project_json).map_err(|_| "The package's project.json is not valid.".to_string())?;
     let missing = missing_fields(&project);
-    if missing.len() == RECORD_FIELDS.len() + 1 {
+    if RECORD_FIELDS.iter().all(|field| missing.contains(field)) {
         return Err("The package's project.json is not a Matics project.".into());
     }
     if !missing.is_empty() {
@@ -110,7 +113,7 @@ pub fn import_package(path: String, root: String) -> CmdResult<String> {
             missing.join(", ")
         ));
     }
-    let name = project.get("name").and_then(|v| v.as_str()).unwrap_or("Imported project");
+    let name = project.get("name").and_then(|v| v.as_str()).unwrap_or_default();
 
     let dir = new_project_dir(root, name.to_string())?;
     let result = unpack(&mut archive, Path::new(&dir), &project_json);
@@ -215,7 +218,9 @@ mod tests {
     #[test]
     fn a_package_from_an_older_build_names_what_it_lacks() {
         let older = COMPLETE_PROJECT.replace(r#","messages":{},"sketches":{}"#, "");
-        assert!(import_error("older", &older).contains("missing messages, sketches"));
+        assert!(import_error("older", &older).contains("missing messages, sketches."));
+        let unnamed = COMPLETE_PROJECT.replace(r#""name":"Round trip","#, "");
+        assert!(import_error("unnamed", &unnamed).contains("missing name."));
     }
 
     #[test]

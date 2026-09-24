@@ -3,6 +3,7 @@ import { ChevronDown, Copy, FilePlus2, FolderOpen, Package, PackageOpen, Pencil,
 import { useProjectStore } from "@/store/project-store";
 import { sampleProject } from "@/model/sample-project";
 import { entryDate, fileManagerName, isDesktop, trashName } from "@/lib/desktop";
+import { reportErrors } from "@/lib/commands";
 import { MenuHeading, MenuItem, MenuPanel, MenuSeparator, useDropdown } from "./Menu";
 
 export function ProjectMenu() {
@@ -100,7 +101,7 @@ export function ProjectMenu() {
               <button
                 key={entry.id}
                 onClick={() => {
-                  void switchProject(entry.id);
+                  void reportErrors(() => switchProject(entry.id));
                   setOpen(false);
                 }}
                 className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left ${
@@ -134,6 +135,7 @@ export function ProjectMenu() {
 }
 
 function shortPath(path: string) {
-  const parts = path.split("/").filter(Boolean);
-  return parts.length > 2 ? `.../${parts.slice(-2).join("/")}` : path;
+  const separator = path.includes("\\") ? "\\" : "/";
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  return parts.length > 2 ? `...${separator}${parts.slice(-2).join(separator)}` : path;
 }
