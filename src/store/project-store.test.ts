@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sampleProject } from "@/model/sample-project";
 import { busGeometry } from "@/views/diagram/to-flow";
 import { useProjectStore } from "./project-store";
+import { storage } from "./storage";
 
 describe("undo", () => {
   beforeEach(() => {
@@ -92,5 +93,16 @@ describe("messages and sketches", () => {
     store.updateSketch(sketchId, { deviceIds: ["modem"] });
     store.removeDevice("modem");
     expect(useProjectStore.getState().project.sketches[sketchId].deviceIds).toEqual(["modem"]);
+  });
+});
+
+describe("workspace prefs", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("takes back a star that could not be saved", async () => {
+    useProjectStore.setState({ prefs: { starred: [], archived: [], opened: {} } });
+    vi.spyOn(storage, "savePrefs").mockRejectedValue(new Error("disk full"));
+    await expect(useProjectStore.getState().setStarred("some-project", true)).rejects.toThrow("disk full");
+    expect(useProjectStore.getState().prefs.starred).toEqual([]);
   });
 });

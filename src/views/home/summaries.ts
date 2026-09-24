@@ -21,9 +21,14 @@ function summarizeStored(raw: unknown): Summary {
   }
 }
 
-// Kept across visits to the home page; a save changes updatedAt and so the key.
-const cache = new Map<string, Summary>();
-const cacheKey = (entry: ProjectMeta) => `${entry.id}@${entry.updatedAt}`;
+// Kept across visits to the home page, one per project; a save changes updatedAt, which
+// makes the cached summary stale.
+const cache = new Map<string, { updatedAt: string; summary: Summary }>();
+
+function cached(entry: ProjectMeta) {
+  const hit = cache.get(entry.id);
+  return hit?.updatedAt === entry.updatedAt ? hit.summary : undefined;
+}
 
 // Previews for the project cards. Other projects are read from storage one at a time and
 // fill in as they arrive; the open project comes from memory.
@@ -36,15 +41,16 @@ export function useSummaries(entries: ProjectMeta[]) {
     let cancelled = false;
     void (async () => {
       for (const entry of entries) {
-        const key = cacheKey(entry);
         if (cancelled) return;
-        if (entry.id === useProjectStore.getState().project.id || cache.has(key)) continue;
+        if (entry.id === useProjectStore.getState().project.id || cached(entry)) continue;
+        let summary: Summary;
         try {
           const raw = await useProjectStore.getState().peekProject(entry.id);
-          cache.set(key, raw === undefined ? { kind: "broken", reason: "The project could not be found." } : summarizeStored(raw));
+          summary = raw === undefined ? { kind: "broken", reason: "The project could not be found." } : summarizeStored(raw);
         } catch (error) {
-          cache.set(key, { kind: "broken", reason: error instanceof Error ? error.message : String(error) });
+          summary = { kind: "broken", reason: error instanceof Error ? error.message : String(error) };
         }
+        cache.set(entry.id, { updatedAt: entry.updatedAt, summary });
         if (!cancelled) arrived();
       }
     })();
@@ -53,5 +59,5 @@ export function useSummaries(entries: ProjectMeta[]) {
     };
   }, [entries]);
 
-  return (entry: ProjectMeta): Summary | undefined => (entry.id === project.id ? current : cache.get(cacheKey(entry)));
+  return (entry: ProjectMeta): Summary | undefined => (entry.id === project.id ? current : cached(entry));
 }

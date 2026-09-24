@@ -85,24 +85,32 @@ export function thumbnailOf(project: Project): Thumbnail | null {
   });
   const wires = wiresOf(project);
 
-  const xs: number[] = [];
-  const ys: number[] = [];
+  // A loop rather than Math.min(...), which has an argument limit a big project can reach.
+  const bounds = { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity };
+  const include = (x: number, y: number) => {
+    bounds.left = Math.min(bounds.left, x);
+    bounds.right = Math.max(bounds.right, x);
+    bounds.top = Math.min(bounds.top, y);
+    bounds.bottom = Math.max(bounds.bottom, y);
+  };
   for (const rect of [...zones, ...images, ...devices]) {
-    xs.push(rect.x, rect.x + rect.width);
-    ys.push(rect.y, rect.y + rect.height);
+    include(rect.x, rect.y);
+    include(rect.x + rect.width, rect.y + rect.height);
   }
   for (const bus of buses) {
-    xs.push(bus.x);
-    ys.push(bus.top, bus.bottom);
+    include(bus.x, bus.top);
+    include(bus.x, bus.bottom);
   }
-  for (const point of wires.flatMap((wire) => wire.points)) {
-    xs.push(point.x);
-    ys.push(point.y);
+  for (const wire of wires) {
+    for (const point of wire.points) include(point.x, point.y);
   }
-  if (xs.length === 0) return null;
+  if (bounds.left === Infinity) return null;
 
-  const x = Math.min(...xs) - PADDING;
-  const y = Math.min(...ys) - PADDING;
-  const box = { x, y, width: Math.max(...xs) + PADDING - x, height: Math.max(...ys) + PADDING - y };
+  const box = {
+    x: bounds.left - PADDING,
+    y: bounds.top - PADDING,
+    width: bounds.right - bounds.left + 2 * PADDING,
+    height: bounds.bottom - bounds.top + 2 * PADDING,
+  };
   return { box, zones, images, devices, buses, wires };
 }

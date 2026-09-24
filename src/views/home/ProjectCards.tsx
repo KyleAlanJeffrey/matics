@@ -194,9 +194,11 @@ export function ProjectCard({ entry }: { entry: HomeEntry }) {
             <Facts entry={entry} />
           </div>
         </div>
-        <span className="pointer-events-none absolute bottom-3 right-3 hidden items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-[13px] font-semibold text-charcoal group-hover:flex">
-          Open <ArrowRight className="h-4 w-4" />
-        </span>
+        {entry.summary?.kind !== "broken" && (
+          <span className="pointer-events-none absolute bottom-3 right-3 hidden items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-[13px] font-semibold text-charcoal group-hover:flex">
+            Open <ArrowRight className="h-4 w-4" />
+          </span>
+        )}
       </button>
       <div className="absolute right-2 top-2">
         <ProjectActions entry={entry} />

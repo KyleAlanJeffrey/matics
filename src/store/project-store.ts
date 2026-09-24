@@ -401,7 +401,7 @@ export const useProjectStore = create<ProjectState>()(
         if (projectId === get().project.id) return;
         await flushPendingSave();
         const project = await storage.load(projectId);
-        if (!project) return;
+        if (!project) throw new Error("That project could not be found. Its folder may have been moved or deleted.");
         await setCurrent(projectId, set, get);
         set((state) => {
           state.project = project;
@@ -464,11 +464,13 @@ export const useProjectStore = create<ProjectState>()(
         // The key has to be read before the folder is forgotten.
         const key = prefKey(projectId);
         await storage.remove(projectId);
+        // Leftover keys for a folder that is gone are harmless, so a failed write here must
+        // not fail the delete.
         await updatePrefs(set, get, (prefs) => {
           prefs.starred = prefs.starred.filter((k) => k !== key);
           prefs.archived = prefs.archived.filter((k) => k !== key);
           delete prefs.opened[key];
-        });
+        }).catch(() => {});
         if (get().project.id === projectId) {
           let next =
             remaining.length > 0
@@ -1419,9 +1421,11 @@ async function adoptProject(
 // Opens with this project next launch, and tells the project home when it was last opened.
 async function setCurrent(projectId: string, set: Setter, get: () => ProjectState) {
   await storage.setCurrent(projectId);
+  // Only the home's "Last opened" depends on this, so a failed write must not keep the
+  // project from opening.
   await updatePrefs(set, get, (prefs) => {
     prefs.opened[prefKey(projectId)] = new Date().toISOString();
-  });
+  }).catch(() => {});
 }
 
 // Workspace prefs follow the folder on the desktop, so a copied folder that is given a
@@ -1430,9 +1434,19 @@ export function prefKey(projectId: string) {
   return storage.dirOf(projectId) ?? projectId;
 }
 
+// Undone in memory when it cannot be saved, so the home never shows a star that a restart
+// would lose.
 async function updatePrefs(set: Setter, get: () => ProjectState, change: (prefs: WorkspacePrefs) => void) {
+  const before = get().prefs;
   set((state) => change(state.prefs));
-  await storage.savePrefs(get().prefs);
+  try {
+    await storage.savePrefs(get().prefs);
+  } catch (error) {
+    set((state) => {
+      state.prefs = before;
+    });
+    throw error;
+  }
 }
 
 function toggled(keys: string[], key: string, on: boolean) {
