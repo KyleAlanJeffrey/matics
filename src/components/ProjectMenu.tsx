@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { ChevronDown, Copy, FilePlus2, FolderOpen, Package, PackageOpen, Pencil, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router";
+import { ChevronDown, Copy, FilePlus2, FolderOpen, LayoutGrid, Package, PackageOpen, Pencil, Trash2 } from "lucide-react";
 import { useProjectStore } from "@/store/project-store";
 import { sampleProject } from "@/model/sample-project";
-import { entryDate, fileManagerName, isDesktop, trashName } from "@/lib/desktop";
-import { reportErrors } from "@/lib/commands";
+import { entryDate, fileManagerName, isDesktop, shortPath, trashName } from "@/lib/desktop";
+import { HOME_PATH, reportErrors, shortcutFor } from "@/lib/commands";
 import { MenuHeading, MenuItem, MenuPanel, MenuSeparator, useDropdown } from "./Menu";
 
 export function ProjectMenu() {
@@ -22,6 +23,7 @@ export function ProjectMenu() {
     openPackage,
   } = useProjectStore();
   const { open, setOpen, ref: menuRef } = useDropdown();
+  const navigate = useNavigate();
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState(project.name);
 
@@ -113,6 +115,15 @@ export function ProjectMenu() {
               </button>
             ))}
           </div>
+          <MenuItem
+            icon={LayoutGrid}
+            label="All projects"
+            hint={shortcutFor("view:home")}
+            onClick={() => {
+              setOpen(false);
+              navigate(HOME_PATH);
+            }}
+          />
           <MenuSeparator />
           <MenuItem icon={FilePlus2} label="New diagram" hint="keeps the product library" onClick={onNew} />
           <MenuItem icon={FilePlus2} label="New from the demo sample" onClick={onNewFromSample} />
@@ -132,10 +143,4 @@ export function ProjectMenu() {
       )}
     </div>
   );
-}
-
-function shortPath(path: string) {
-  const separator = path.includes("\\") ? "\\" : "/";
-  const parts = path.split(/[\\/]/).filter(Boolean);
-  return parts.length > 2 ? `...${separator}${parts.slice(-2).join(separator)}` : path;
 }

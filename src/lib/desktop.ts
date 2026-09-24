@@ -13,6 +13,9 @@ export interface AppConfig {
   root?: string | null;
   current?: string | null;
   recent: string[];
+  starred?: string[];
+  archived?: string[];
+  opened?: Record<string, string>;
 }
 
 export interface ProjectEntry {
@@ -91,6 +94,13 @@ export function trashName() {
 
 export function joinPath(dir: string, rel: string) {
   return `${dir.replace(/[\\/]+$/, "")}/${rel}`;
+}
+
+// The last two folders of a path, for a menu hint.
+export function shortPath(path: string) {
+  const separator = path.includes("\\") ? "\\" : "/";
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  return parts.length > 2 ? `...${separator}${parts.slice(-2).join(separator)}` : path;
 }
 
 export function fileName(path: string) {

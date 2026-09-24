@@ -6,7 +6,7 @@ import { bundleExit, memberEntry } from "./bundle-geometry";
 
 export const BUS_TAP_HANDLE = "tap";
 export const DEVICE_CARD_WIDTH = 240;
-const DEVICE_CARD_HEIGHT_ESTIMATE = 200;
+export const DEVICE_CARD_HEIGHT_ESTIMATE = 200;
 const BUS_PADDING = 40;
 export const DEFAULT_BUS_LENGTH = 320;
 export const MIN_BUS_LENGTH = 64;

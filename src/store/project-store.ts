@@ -26,6 +26,7 @@ import {
   type ProjectFile,
   type WireBundle,
   type ProjectMeta,
+  type WorkspacePrefs,
   type Zone,
 } from "@/model/types";
 import { sampleProject } from "@/model/sample-project";
@@ -109,6 +110,9 @@ interface ProjectState {
   projects: ProjectMeta[];
   // Folder of the open project (desktop app only).
   projectDir: string | null;
+  // Folder that holds the project folders (desktop app only).
+  workspaceDir: string | null;
+  prefs: WorkspacePrefs;
   loaded: boolean;
   // Why the project could not be loaded or saved, for the UI to show.
   loadError: string | null;
@@ -120,6 +124,10 @@ interface ProjectState {
     options?: { copyLibrary?: boolean; fromSample?: boolean },
   ) => Promise<void>;
   switchProject: (projectId: string) => Promise<void>;
+  // Reads another project for its preview on the project home, without opening it.
+  peekProject: (projectId: string) => Promise<unknown>;
+  setStarred: (projectId: string, starred: boolean) => Promise<void>;
+  setArchived: (projectId: string, archived: boolean) => Promise<void>;
   renameProject: (name: string) => void;
   setProjectDescription: (description: string) => void;
   duplicateProject: () => Promise<void>;
@@ -317,6 +325,8 @@ export const useProjectStore = create<ProjectState>()(
       project: sampleProject,
       projects: [],
       projectDir: null,
+      workspaceDir: null,
+      prefs: { starred: [], archived: [], opened: {} },
       loaded: false,
       loadError: null,
       saveError: null,
@@ -329,7 +339,11 @@ export const useProjectStore = create<ProjectState>()(
           set((state) => {
             state.loadError = null;
           });
-          let { projects: index, currentId } = await storage.init();
+          let { projects: index, currentId, prefs } = await storage.init();
+          set((state) => {
+            state.prefs = prefs;
+            state.workspaceDir = storage.rootDir || null;
+          });
           // A project that cannot be opened (one saved by an older build) is skipped, so
           // it cannot keep the app from starting; the others still open.
           const candidates = [...new Set([currentId, ...index.map((m) => m.id)])].filter((id): id is string => !!id);
@@ -352,7 +366,7 @@ export const useProjectStore = create<ProjectState>()(
             index = [...index.filter((m) => m.id !== sample.id), sample];
             await storage.updateIndex(index);
           }
-          await storage.setCurrent(project.id);
+          await setCurrent(project.id, set, get);
           set((state) => {
             state.project = project!;
             state.projects = index;
@@ -388,13 +402,25 @@ export const useProjectStore = create<ProjectState>()(
         await flushPendingSave();
         const project = await storage.load(projectId);
         if (!project) return;
-        await storage.setCurrent(projectId);
+        await setCurrent(projectId, set, get);
         set((state) => {
           state.project = project;
           state.projectDir = storage.dirOf(projectId);
         });
         useProjectStore.temporal.getState().clear();
       },
+
+      peekProject: (projectId) => storage.peek(projectId),
+
+      setStarred: (projectId, starred) =>
+        updatePrefs(set, get, (prefs) => {
+          prefs.starred = toggled(prefs.starred, prefKey(projectId), starred);
+        }),
+
+      setArchived: (projectId, archived) =>
+        updatePrefs(set, get, (prefs) => {
+          prefs.archived = toggled(prefs.archived, prefKey(projectId), archived);
+        }),
 
       renameProject: (name) =>
         set((state) => {
@@ -435,7 +461,14 @@ export const useProjectStore = create<ProjectState>()(
       deleteProject: async (projectId) => {
         await flushPendingSave();
         const remaining = get().projects.filter((m) => m.id !== projectId);
+        // The key has to be read before the folder is forgotten.
+        const key = prefKey(projectId);
         await storage.remove(projectId);
+        await updatePrefs(set, get, (prefs) => {
+          prefs.starred = prefs.starred.filter((k) => k !== key);
+          prefs.archived = prefs.archived.filter((k) => k !== key);
+          delete prefs.opened[key];
+        });
         if (get().project.id === projectId) {
           let next =
             remaining.length > 0
@@ -446,7 +479,7 @@ export const useProjectStore = create<ProjectState>()(
             await storage.save(next);
             remaining.push(withDir(meta(next)));
           }
-          await storage.setCurrent(next.id);
+          await setCurrent(next.id, set, get);
           set((state) => {
             state.project = next!;
             state.projects = remaining;
@@ -1374,13 +1407,37 @@ async function adoptProject(
   await storage.save(project);
   const index = [...get().projects, withDir(meta(project))];
   await storage.updateIndex(index);
-  await storage.setCurrent(project.id);
+  await setCurrent(project.id, set, get);
   set((state) => {
     state.project = project;
     state.projects = index;
     state.projectDir = storage.dirOf(project.id);
   });
   useProjectStore.temporal.getState().clear();
+}
+
+// Opens with this project next launch, and tells the project home when it was last opened.
+async function setCurrent(projectId: string, set: Setter, get: () => ProjectState) {
+  await storage.setCurrent(projectId);
+  await updatePrefs(set, get, (prefs) => {
+    prefs.opened[prefKey(projectId)] = new Date().toISOString();
+  });
+}
+
+// Workspace prefs follow the folder on the desktop, so a copied folder that is given a
+// fresh id (see DesktopStorage.claim) cannot take over the original's star.
+export function prefKey(projectId: string) {
+  return storage.dirOf(projectId) ?? projectId;
+}
+
+async function updatePrefs(set: Setter, get: () => ProjectState, change: (prefs: WorkspacePrefs) => void) {
+  set((state) => change(state.prefs));
+  await storage.savePrefs(get().prefs);
+}
+
+function toggled(keys: string[], key: string, on: boolean) {
+  const rest = keys.filter((k) => k !== key);
+  return on ? [...rest, key] : rest;
 }
 
 function withDir(entry: ProjectMeta): ProjectMeta {

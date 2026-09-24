@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { NavLink } from "react-router";
+import { Link, NavLink, useLocation } from "react-router";
 import { useStore } from "zustand";
 import { AlertTriangle, Check, Redo2, Undo2 } from "lucide-react";
 import { useProjectStore } from "@/store/project-store";
@@ -12,7 +12,7 @@ import { FileMenu } from "./FileMenu";
 import { UpdateNotice } from "./UpdateNotice";
 import { WindowControls } from "./WindowControls";
 import { useNativeMenu } from "@/lib/native-menu";
-import { useCommands, useCommandShortcuts } from "@/lib/commands";
+import { CommandsContext, HOME_PATH, useCommands, useCommandShortcuts } from "@/lib/commands";
 import { watchForUpdates } from "@/lib/updates";
 import { fieldHandles, inSketchCanvas, stepProjectHistory } from "@/lib/editing";
 
@@ -62,6 +62,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const projectDir = useProjectStore((s) => s.projectDir);
   const projectId = useProjectStore((s) => s.project.id);
   const saveError = useProjectStore((s) => s.saveError);
+  // The project home has no project on screen, so the header leaves out the project's
+  // name, pages, undo and save state there.
+  const home = useLocation().pathname === HOME_PATH;
 
   // The selection lives in the URL and means nothing in another project.
   const lastProjectId = useRef(projectId);
@@ -101,6 +104,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         return;
       }
       const direction = key === "z" ? (event.shiftKey ? "redo" : "undo") : key === "y" ? "redo" : null;
+      if (window.location.pathname === HOME_PATH) return;
       // The note editor already undid its own text, or the field still has typing to undo.
       // The sketch canvas keeps its own history.
       if (!direction || event.defaultPrevented || inSketchCanvas(event.target) || fieldHandles(direction, event.target)) return;
@@ -118,55 +122,67 @@ export function AppShell({ children }: { children: ReactNode }) {
         data-tauri-drag-region
         className={`flex h-14 shrink-0 select-none items-center gap-2 bg-charcoal text-white xl:gap-3 ${useTrafficLightInset() ? "pl-[104px]" : "pl-5"} ${drawsWindowControls() ? "pr-0" : "pr-5"}`}
       >
-        <MaticsLogo inverse wordmarkClass="hidden xl:inline" />
+        <Link to={HOME_PATH} title="All projects" className="shrink-0">
+          <MaticsLogo inverse wordmarkClass={home ? "" : "hidden xl:inline"} />
+        </Link>
         <span className="h-6 w-px bg-white/20" />
-        <ProjectMenu />
+        {home ? <span className="px-2 text-[15px] text-white/80">Workspace</span> : <ProjectMenu />}
         {!hasNativeMenu() && <FileMenu run={run} />}
-        <nav className="mx-auto flex h-full shrink-0 gap-1 xl:gap-2">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={selectedId ? `${item.to}?selected=${selectedId}` : item.to}
-              className={({ isActive }) =>
-                `flex items-center whitespace-nowrap border-b-[3px] px-3 pt-[3px] text-[15px] font-semibold xl:px-4 ${isActive ? "border-brand text-white" : "border-transparent text-white/70 hover:text-white"}`
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-        <UpdateNotice versionClass={wideOnly()} />
-        <div className="flex items-center gap-1">
-          <button
-            className="rounded-md p-1.5 text-white/80 hover:bg-white/10 disabled:opacity-30"
-            onClick={() => stepProjectHistory("undo")}
-            disabled={pastStates.length === 0}
-            title="Undo (Cmd/Ctrl+Z)"
-          >
-            <Undo2 className="h-4 w-4" />
-          </button>
-          <button
-            className="rounded-md p-1.5 text-white/80 hover:bg-white/10 disabled:opacity-30"
-            onClick={() => stepProjectHistory("redo")}
-            disabled={futureStates.length === 0}
-            title="Redo (Shift+Cmd/Ctrl+Z)"
-          >
-            <Redo2 className="h-4 w-4" />
-          </button>
-        </div>
-        {saveError ? (
-          <div className="flex shrink-0 items-center gap-1 whitespace-nowrap text-red-300" title={saveError}>
-            <AlertTriangle className="h-4 w-4" /> Not saved
-          </div>
+        {home ? (
+          <div data-tauri-drag-region className="h-full flex-1" />
         ) : (
-          <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-white/75" title={projectDir ?? (isDesktop() ? "Saved to folder" : "Saved in browser")}>
-            <Check className="h-4 w-4 text-white" />
-            <span className={justSaved ? "font-semibold text-white" : wideOnly()}>{justSaved ? "Saved" : isDesktop() ? "Saved to folder" : "Saved in browser"}</span>
-          </div>
+          <nav className="mx-auto flex h-full shrink-0 gap-1 xl:gap-2">
+            {navItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={selectedId ? `${item.to}?selected=${selectedId}` : item.to}
+                className={({ isActive }) =>
+                  `flex items-center whitespace-nowrap border-b-[3px] px-3 pt-[3px] text-[15px] font-semibold xl:px-4 ${isActive ? "border-brand text-white" : "border-transparent text-white/70 hover:text-white"}`
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+        )}
+        <UpdateNotice versionClass={wideOnly()} />
+        {!home && (
+          <>
+            <div className="flex items-center gap-1">
+              <button
+                className="rounded-md p-1.5 text-white/80 hover:bg-white/10 disabled:opacity-30"
+                onClick={() => stepProjectHistory("undo")}
+                disabled={pastStates.length === 0}
+                title="Undo (Cmd/Ctrl+Z)"
+              >
+                <Undo2 className="h-4 w-4" />
+              </button>
+              <button
+                className="rounded-md p-1.5 text-white/80 hover:bg-white/10 disabled:opacity-30"
+                onClick={() => stepProjectHistory("redo")}
+                disabled={futureStates.length === 0}
+                title="Redo (Shift+Cmd/Ctrl+Z)"
+              >
+                <Redo2 className="h-4 w-4" />
+              </button>
+            </div>
+            {saveError ? (
+              <div className="flex shrink-0 items-center gap-1 whitespace-nowrap text-red-300" title={saveError}>
+                <AlertTriangle className="h-4 w-4" /> Not saved
+              </div>
+            ) : (
+              <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-white/75" title={projectDir ?? (isDesktop() ? "Saved to folder" : "Saved in browser")}>
+                <Check className="h-4 w-4 text-white" />
+                <span className={justSaved ? "font-semibold text-white" : wideOnly()}>{justSaved ? "Saved" : isDesktop() ? "Saved to folder" : "Saved in browser"}</span>
+              </div>
+            )}
+          </>
         )}
         {drawsWindowControls() && <WindowControls />}
       </header>
-      <main className="min-h-0 flex-1">{children}</main>
+      <main className="min-h-0 flex-1">
+        <CommandsContext.Provider value={run}>{children}</CommandsContext.Provider>
+      </main>
     </div>
   );
 }

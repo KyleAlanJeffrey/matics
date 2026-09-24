@@ -29,6 +29,8 @@ changes, the documentation changes with it.
 
 ## Features
 
+- **Project home.** Every project on one page, with a preview of its schematic. Search,
+  sort, star the ones you use most and archive the ones you are done with.
 - **Schematic.** Device cards with ports, wires, shared buses, zones, quantity stacks
   and pictures. Snap to grid, route wires by hand, copy and paste whole zones.
 - **Documentation.** A page for every device, network and service: linked PDFs and web
@@ -70,8 +72,9 @@ package.
 
 ## Quickstart
 
-1. **Open Matics.** The first launch opens the Demo Rover sample, a small fictional
-   robot to explore. Start your own with **File > New Diagram** (Cmd+N).
+1. **Open Matics.** It opens on the project home. The first launch lists the Demo Rover
+   sample, a small fictional robot to explore. Start your own with **New project**
+   (Cmd+N). The Matics logo in the header brings you back to the home at any time.
 2. **Add devices.** Drag a product from the Device library onto the canvas, or click
    **Add device**. Draw a **Zone** around devices that belong together.
 3. **Wire them up.** Add a **Bus** for each shared network (CAN, Ethernet), then drag
@@ -99,6 +102,7 @@ Projects save automatically to `~/Documents/Matics/<project>/`.
 | Action | macOS | Windows and Linux |
 | --- | --- | --- |
 | New diagram | Cmd+N | Ctrl+N |
+| All projects (the project home) | Cmd+0 | Ctrl+0 |
 | Diagram, Documentation, Communications, Sketches, Report | Cmd+1 to Cmd+5 | Ctrl+1 to Ctrl+5 |
 | Search documentation | Cmd+K | Ctrl+K |
 | Undo / redo | Cmd+Z / Cmd+Shift+Z | Ctrl+Z / Ctrl+Shift+Z |
@@ -152,7 +156,7 @@ Other scripts:
 ```
 src/model       types, sample project, parsers (DBC, .proto), derived data
 src/store       project store with undo; disk storage in the app, IndexedDB in the browser
-src/views       one folder per page: diagram, notes, communications, frames, sketches, report
+src/views       one folder per page: home, diagram, notes, communications, frames, sketches, report
 src/components  app shell and shared UI
 src/lib         desktop commands, assets, menus, file saving
 src-tauri       the desktop shell: window, macOS menu bar, project folders, packages, updates

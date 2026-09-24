@@ -5,9 +5,19 @@ the stack decision in `00-tech-stack.md`.
 
 ## App shell
 
-- Pages: Diagram (`/schematic`), Documentation (`/notes`), Communications
-  (`/communications`), Sketches (`/sketches`) and Report (`/report`). Selection lives in the
-  URL (`?selected=id`), so moving between pages keeps it.
+- Pages: the project home (`/`), then the open project's Diagram (`/schematic`),
+  Documentation (`/notes`), Communications (`/communications`), Sketches (`/sketches`) and
+  Report (`/report`). Selection lives in the URL (`?selected=id`), so moving between pages
+  keeps it.
+- The app starts on the project home (`src/views/home`). The store still loads the last
+  project at startup; the home shows it under "Continue working", and the header leaves
+  out its name, pages, undo and save state while the home is on screen. New, Open and
+  Import run from the home go on to the diagram (`useShowOpenedProject`). Card previews
+  are drawn from each project's data (`thumbnail.ts`), not rendered by React Flow: cards
+  at their estimated size, buses, and wires leaving from a card's middle. Other projects
+  are read with `storage.peek`, which does no checks and writes nothing; one that fails
+  the shape check shows as "Cannot be opened" and can still be trashed from its menu.
+  Stars, archive and last-opened times are per computer (see COMPATIBILITY.md).
 - Menu commands live in `src/lib/commands.ts` and run from three places. On macOS, the
   native menu bar (`src-tauri/src/menu.rs`) emits a "menu" event that
   `src/lib/native-menu.ts` passes on. Windows, Linux and the browser build show the in-app
