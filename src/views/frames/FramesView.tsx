@@ -652,7 +652,7 @@ function HexInput({ value, onCommit }: { value: number; onCommit: (value: number
 
 // A label around a group of controls clicks the first of them (a remove button) when its
 // text is clicked, so groups get a plain heading instead.
-function Field({ label, icon, group = false, children }: { label: string; icon?: React.ReactNode; group?: boolean; children: React.ReactNode }) {
+export function Field({ label, icon, group = false, children }: { label: string; icon?: React.ReactNode; group?: boolean; children: React.ReactNode }) {
   const heading = (
     <span className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
       {icon} {label}

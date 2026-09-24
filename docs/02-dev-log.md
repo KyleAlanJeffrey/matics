@@ -6,7 +6,7 @@ the stack decision in `00-tech-stack.md`.
 ## App shell
 
 - Pages: the project home (`/`), then the open project's Diagram (`/schematic`),
-  Documentation (`/notes`), Communications (`/communications`), Sketches (`/sketches`) and
+  Documentation (`/notes`), I/O (`/io`), Communications (`/communications`), Sketches (`/sketches`) and
   Report (`/report`). Selection lives in the URL (`?selected=id`), so moving between pages
   keeps it.
 - The app starts on the project home (`src/views/home`). The store still loads the last
@@ -22,7 +22,7 @@ the stack decision in `00-tech-stack.md`.
   native menu bar (`src-tauri/src/menu.rs`) emits a "menu" event that
   `src/lib/native-menu.ts` passes on. Windows, Linux and the browser build show the in-app
   File menu in the header (`FileMenu.tsx`) instead, and on the desktop the page handles
-  the menu shortcuts itself (Ctrl+N, Ctrl+O, Ctrl+1 to Ctrl+5 ...). A window menu there
+  the menu shortcuts itself (Ctrl+N, Ctrl+O, Ctrl+1 to Ctrl+6 ...). A window menu there
   would stack a second bar between the title bar and the header. On macOS, Edit and Window
   are the platform's own items so text fields keep copy, paste and undo. WKWebView offers
   key equivalents to the page first, so the page's Cmd+S and Cmd+Z handlers still run
@@ -136,6 +136,18 @@ the stack decision in `00-tech-stack.md`.
   most sites refuse cross-origin requests.
 - Devices carry services (software on each placed copy, with an optional TCP or UDP port).
   Each service has its own documentation page.
+
+## I/O
+
+- Signals, Modules and Mapping review tabs (`?tab=`), scoped to a controller or module
+  from the hardware tree (`?controller=`, `?module=`). The selected signal is `?selected=`
+  and opens the inspector, where every field edits in place; "Map signal" opens a form
+  instead, guessing type and direction from the channel name until they are set.
+- Import reads an `IoMap.iom` in the page and asks which controller it belongs to,
+  preferring a device named after a module in the file. A channel's settings (PWM period,
+  current feedback) are attached to the output channel with the same number.
+- The review lists physical channels missing a field device, pin or (for analog
+  channels) range. Missing documentation is not reported as a wrong mapping.
 
 ## Communications
 

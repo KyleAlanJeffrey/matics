@@ -19,6 +19,7 @@ import { fieldHandles, inSketchCanvas, stepProjectHistory } from "@/lib/editing"
 const navItems = [
   { to: "/schematic", label: "Diagram" },
   { to: "/notes", label: "Documentation" },
+  { to: "/io", label: "I/O" },
   { to: "/communications", label: "Communications" },
   { to: "/sketches", label: "Sketches" },
 ];
