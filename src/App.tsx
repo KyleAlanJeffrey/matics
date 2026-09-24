@@ -8,6 +8,7 @@ import { CommunicationsView } from "@/views/communications/CommunicationsView";
 import { SketchesView } from "@/views/sketches/SketchesView";
 import { ReportView } from "@/views/report/ReportView";
 import { HomeView } from "@/views/home/HomeView";
+import { IoView } from "@/views/io/IoView";
 
 export default function App() {
   const load = useProjectStore((s) => s.load);
@@ -40,6 +41,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomeView />} />
         <Route path="/schematic" element={<DiagramView />} />
+        <Route path="/io" element={<IoView />} />
         <Route path="/communications" element={<CommunicationsView />} />
         <Route path="/sketches" element={<SketchesView />} />
         <Route path="/report" element={<ReportView />} />
