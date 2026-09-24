@@ -413,3 +413,10 @@ label:has(> input[type="checkbox"]:not(:disabled)) {
   color: #94a3b8;
   font-style: italic;
 }
+
+/* Project home previews: a white sheet with a faint drawing grid. */
+.thumbnail-grid {
+  background-color: #ffffff;
+  background-image: linear-gradient(#eeeeeb 1px, transparent 1px), linear-gradient(90deg, #eeeeeb 1px, transparent 1px);
+  background-size: 12px 12px;
+}

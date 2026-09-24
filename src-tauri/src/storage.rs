@@ -11,6 +11,7 @@
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
+use std::collections::BTreeMap;
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
@@ -30,6 +31,14 @@ pub struct AppConfig {
     /// Project folders opened from outside the root.
     #[serde(default)]
     pub recent: Vec<String>,
+    /// Starred and archived project folders, for the project home.
+    #[serde(default)]
+    pub starred: Vec<String>,
+    #[serde(default)]
+    pub archived: Vec<String>,
+    /// When each project folder was last opened.
+    #[serde(default)]
+    pub opened: BTreeMap<String, String>,
 }
 
 #[derive(Serialize, Clone)]

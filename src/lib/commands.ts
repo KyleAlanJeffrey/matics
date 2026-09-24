@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { createContext, useCallback, useContext, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { useProjectStore } from "@/store/project-store";
 import { desktop, fileName, hasNativeMenu, isDesktop } from "./desktop";
@@ -23,13 +23,17 @@ export type CommandId =
   | "file:export-schematic-png"
   | "edit:undo"
   | "edit:redo"
+  | "view:home"
   | "view:schematic"
   | "view:documentation"
   | "view:communications"
   | "view:sketches"
   | "view:report";
 
+export const HOME_PATH = "/";
+
 const PAGES: Partial<Record<CommandId, string>> = {
+  "view:home": HOME_PATH,
   "view:schematic": "/schematic",
   "view:communications": "/communications",
   "view:sketches": "/sketches",
@@ -50,6 +54,7 @@ const SHORTCUTS: { key: string; shift?: boolean; command: CommandId }[] = [
   { key: "i", shift: true, command: "file:import-diagram" },
   { key: "e", shift: true, command: "file:export-diagram" },
   { key: "p", command: "file:export-report-pdf" },
+  { key: "0", command: "view:home" },
   { key: "1", command: "view:schematic" },
   { key: "2", command: "view:documentation" },
   { key: "3", command: "view:communications" },
@@ -78,8 +83,23 @@ export async function reportErrors(action: () => Promise<unknown>) {
   }
 }
 
+// The project home has no project on screen, so a command there that opens one (New,
+// Open, Import) goes on to show it.
+export function useShowOpenedProject() {
+  const navigate = useNavigate();
+  return useCallback(
+    async (action: () => Promise<unknown>) => {
+      const before = useProjectStore.getState().project.id;
+      await action();
+      if (window.location.pathname === HOME_PATH && useProjectStore.getState().project.id !== before) navigate("/schematic");
+    },
+    [navigate],
+  );
+}
+
 export function useCommands(save: () => Promise<void>) {
   const navigate = useNavigate();
+  const showOpened = useShowOpenedProject();
   return useCallback(
     (command: CommandId) => {
       const page = PAGES[command];
@@ -114,10 +134,17 @@ export function useCommands(save: () => Promise<void>) {
         "edit:redo": async () => undoOrRedo("redo"),
       };
       const handler = handlers[command];
-      if (handler) void reportErrors(handler);
+      if (handler) void reportErrors(() => showOpened(handler));
     },
-    [navigate, save],
+    [navigate, save, showOpened],
   );
+}
+
+// The header's commands, for pages that offer some of them too.
+export const CommandsContext = createContext<(command: CommandId) => void>(() => {});
+
+export function useRunCommand() {
+  return useContext(CommandsContext);
 }
 
 // The browser keeps its own Ctrl+N, Ctrl+P and Ctrl+1 to 5, so only the desktop app

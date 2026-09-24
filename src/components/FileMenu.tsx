@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useProjectStore } from "@/store/project-store";
 import { isDesktop } from "@/lib/desktop";
-import { shortcutFor, type CommandId } from "@/lib/commands";
+import { shortcutFor, useShowOpenedProject, type CommandId } from "@/lib/commands";
 import { MenuHeading, MenuItem, MenuPanel, MenuSeparator, useDropdown } from "./Menu";
 
 const MOD = typeof navigator !== "undefined" && /Mac/.test(navigator.platform) ? "Cmd" : "Ctrl";
@@ -30,6 +30,7 @@ export function FileMenu({ run }: { run: (command: CommandId) => void }) {
   const productsInput = useRef<HTMLInputElement>(null);
   const [version, setVersion] = useState<string | null>(null);
   const desktop = isDesktop();
+  const showOpened = useShowOpenedProject();
 
   useEffect(() => {
     if (desktop) void getVersion().then(setVersion);
@@ -43,7 +44,7 @@ export function FileMenu({ run }: { run: (command: CommandId) => void }) {
   const onImportProject = async (file: File | undefined) => {
     if (!file) return;
     try {
-      await importProject(file);
+      await showOpened(() => importProject(file));
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "Could not import that file.");
     }

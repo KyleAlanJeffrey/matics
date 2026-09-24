@@ -82,6 +82,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         "View",
         true,
         &[
+            &item(app, "view:home", "All Projects", Some("CmdOrCtrl+0"))?,
+            &separator()?,
             &item(app, "view:schematic", "Diagram", Some("CmdOrCtrl+1"))?,
             &item(app, "view:documentation", "Documentation", Some("CmdOrCtrl+2"))?,
             &item(app, "view:communications", "Communications", Some("CmdOrCtrl+3"))?,

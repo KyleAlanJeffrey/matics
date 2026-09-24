@@ -34,6 +34,9 @@ Sketch scenes are stored in Excalidraw 0.18's element format.
 Folders are found under the projects root (`~/Documents/Matics`, unless `config.json` in
 the app config folder says otherwise) plus any folders opened explicitly, which
 `config.json` remembers under `recent`. Renaming a project does not rename its folder.
+The project home's stars, archive and last-opened times are also in `config.json`
+(`starred`, `archived`, `opened`), keyed by folder path, so they stay on this computer and
+never travel inside a project or package.
 
 Writes are atomic (temp file then rename). Deleting a project moves the folder to the
 Trash. Two machines editing the same synced folder at once will overwrite each other;
@@ -52,7 +55,8 @@ project a new id, so a package can be opened next to the project it came from.
 ## Browser dev build
 
 `pnpm dev` in a browser stores projects in IndexedDB (`diagram-maker:projects`,
-`diagram-maker:project:<id>`, `diagram-maker:current`) and pictures inline as data URLs.
+`diagram-maker:project:<id>`, `diagram-maker:current`, and the project home's
+`diagram-maker:workspace`, keyed by project id) and pictures inline as data URLs.
 Project-folder assets cannot be shown there. This mode exists for UI work only.
 
 ## Note content

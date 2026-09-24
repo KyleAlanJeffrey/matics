@@ -1,9 +1,10 @@
 import { del as idbDel, get as idbGet, set as idbSet } from "idb-keyval";
-import type { Project, ProjectMeta } from "@/model/types";
+import type { Project, ProjectMeta, WorkspacePrefs } from "@/model/types";
 import { saveFile } from "@/lib/save-file";
 
 const INDEX_KEY = "diagram-maker:projects";
 const CURRENT_KEY = "diagram-maker:current";
+const PREFS_KEY = "diagram-maker:workspace";
 
 const projectKey = (id: string) => `diagram-maker:project:${id}`;
 
@@ -21,6 +22,14 @@ export async function loadCurrentId(): Promise<string | null> {
 
 export async function saveCurrentId(id: string) {
   await idbSet(CURRENT_KEY, id);
+}
+
+export async function loadPrefs(): Promise<WorkspacePrefs> {
+  return (await idbGet<WorkspacePrefs>(PREFS_KEY)) ?? { starred: [], archived: [], opened: {} };
+}
+
+export async function savePrefs(prefs: WorkspacePrefs) {
+  await idbSet(PREFS_KEY, prefs);
 }
 
 // IndexedDB layout, used by the browser dev build only. The desktop app stores folders

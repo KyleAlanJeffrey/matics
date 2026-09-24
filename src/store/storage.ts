@@ -1,4 +1,4 @@
-import type { Project, ProjectMeta } from "@/model/types";
+import type { Project, ProjectMeta, WorkspacePrefs } from "@/model/types";
 import { desktop, isDesktop, type AppConfig, type ProjectEntry } from "@/lib/desktop";
 import { materializeAssets } from "@/lib/assets";
 import { assertCompleteProject } from "@/model/project-shape";
@@ -6,21 +6,26 @@ import {
   deleteStoredProject,
   loadCurrentId,
   loadIndex,
+  loadPrefs,
   loadStoredProject,
   saveCurrentId,
   saveIndex,
+  savePrefs,
   saveStoredProject,
 } from "./persistence";
 
 // Where projects live. The desktop app uses folders on disk; the browser dev build keeps
 // projects in IndexedDB so the UI can be worked on without Tauri.
 export interface ProjectStorage {
-  init(): Promise<{ projects: ProjectMeta[]; currentId: string | null }>;
+  init(): Promise<{ projects: ProjectMeta[]; currentId: string | null; prefs: WorkspacePrefs }>;
   load(id: string): Promise<Project | undefined>;
+  // The stored project as it is, for previews: not checked, and nothing is written back.
+  peek(id: string): Promise<unknown>;
   save(project: Project, meta?: { name: string }): Promise<void>;
   remove(id: string): Promise<void>;
   setCurrent(id: string): Promise<void>;
   updateIndex(projects: ProjectMeta[]): Promise<void>;
+  savePrefs(prefs: WorkspacePrefs): Promise<void>;
   // Folder of a project, when it has one.
   dirOf(id: string): string | null;
   // Opens a project folder from anywhere on disk and returns its meta.
@@ -54,7 +59,8 @@ class DesktopStorage implements ProjectStorage {
     const claimed: ProjectEntry[] = [];
     for (const entry of entries) claimed.push(await this.claim(entry));
     const current = claimed.find((e) => e.dir === this.config.current)?.id ?? null;
-    return { projects: claimed.map(({ dir, ...meta }) => ({ ...meta, dir })), currentId: current };
+    const prefs = { starred: this.config.starred ?? [], archived: this.config.archived ?? [], opened: this.config.opened ?? {} };
+    return { projects: claimed.map(({ dir, ...meta }) => ({ ...meta, dir })), currentId: current, prefs };
   }
 
   // A copied folder carries its original's id. Give it a fresh one so both folders stay
@@ -91,6 +97,11 @@ class DesktopStorage implements ProjectStorage {
     return project;
   }
 
+  async peek(id: string) {
+    const dir = this.dirs.get(id);
+    return dir ? desktop.readProject(dir) : undefined;
+  }
+
   async save(project: Project) {
     let dir = this.dirs.get(project.id);
     if (!dir) {
@@ -117,6 +128,11 @@ class DesktopStorage implements ProjectStorage {
 
   // The folder listing is the index; nothing to persist.
   async updateIndex() {}
+
+  async savePrefs(prefs: WorkspacePrefs) {
+    this.config = { ...this.config, ...prefs };
+    await desktop.saveConfig(this.config);
+  }
 
   async openFolder() {
     const dir = await desktop.pickFolder("Open a diagram project folder");
@@ -146,14 +162,20 @@ class DesktopStorage implements ProjectStorage {
 
 class BrowserStorage implements ProjectStorage {
   async init() {
-    return { projects: await loadIndex(), currentId: await loadCurrentId() };
+    return { projects: await loadIndex(), currentId: await loadCurrentId(), prefs: await loadPrefs() };
   }
 
   dirOf() {
     return null;
   }
 
-  load(id: string) {
+  async load(id: string) {
+    const project = await loadStoredProject(id);
+    if (project) assertCompleteProject(project, `"${project.name}"`);
+    return project;
+  }
+
+  peek(id: string) {
     return loadStoredProject(id);
   }
 
@@ -171,6 +193,10 @@ class BrowserStorage implements ProjectStorage {
 
   updateIndex(projects: ProjectMeta[]) {
     return saveIndex(projects);
+  }
+
+  savePrefs(prefs: WorkspacePrefs) {
+    return savePrefs(prefs);
   }
 }
 

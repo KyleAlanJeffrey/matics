@@ -398,6 +398,15 @@ export interface ProjectMeta {
   dir?: string;
 }
 
+// What the project home remembers on this computer, never inside the projects themselves.
+// Keyed by project folder in the desktop app and by project id in the browser build.
+export interface WorkspacePrefs {
+  starred: string[];
+  archived: string[];
+  // When each project was last opened, as ISO strings.
+  opened: Record<string, string>;
+}
+
 // Portable device catalogue ("products") for sharing presets between projects.
 export interface PresetLibraryFile {
   kind: "diagram-maker-presets";
