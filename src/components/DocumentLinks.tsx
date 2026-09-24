@@ -4,6 +4,7 @@ import { ExternalLink, FileUp, Globe, Link2, Plus, X } from "lucide-react";
 import { useProject, useProjectDir, useProjectStore } from "@/store/project-store";
 import { desktop, isDesktop } from "@/lib/desktop";
 import { documentsFor } from "@/model/derived";
+import { entityExists } from "@/model/documentation";
 import type { DocumentKind } from "@/model/types";
 
 const KIND_LABELS: Record<DocumentKind, string> = { pdf: "Datasheet / PDF", guide: "Guide / web page", note: "Note" };
@@ -36,9 +37,11 @@ export function useAttachFile() {
     const projectId = useProjectStore.getState().project.id;
     try {
       const picked = await pickAsset("document");
-      // The copy went into the folder of the project open when the picker was; if another
-      // project is open now, the file stays there as an unused asset.
-      if (!picked || useProjectStore.getState().project.id !== projectId) return null;
+      const { project } = useProjectStore.getState();
+      // The copy went into the folder of the project open when the picker was. If another
+      // project is open now, or the owner was removed meanwhile, the file stays there as an
+      // unused asset.
+      if (!picked || project.id !== projectId || (owner && !entityExists(project, owner))) return null;
       const ext = picked.name.split(".").pop()?.toLowerCase() ?? "";
       return addDocumentLink(owner, { title: picked.name.replace(/\.[^.]+$/, ""), file: picked.rel, kind: ext === "pdf" ? "pdf" : "note" });
     } catch (error) {

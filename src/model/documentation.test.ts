@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { sampleProject } from "./sample-project";
-import { connectedProducts, documentCount, documentOwners, framesForProduct, isOwner, ownerDocuments, searchDocumentation, unfiledDocuments } from "./documentation";
+import { connectedProducts, documentCount, documentOwners, entityExists, framesForProduct, isOwner, ownerDocuments, searchDocumentation, unfiledDocuments } from "./documentation";
 import type { Project } from "./types";
 
 describe("documentation workspace", () => {
@@ -60,5 +60,15 @@ describe("documentation workspace", () => {
     const frame = searchDocumentation(sampleProject, "0x101").find((h) => h.kind === "Frame");
     expect(frame?.label).toBe("DriveCommand");
     expect(frame?.owner).toBe("computer");
+  });
+});
+
+describe("entityExists", () => {
+  it("finds products, buses, messages and services, and not removed ids", () => {
+    expect(entityExists(sampleProject, "computer")).toBe(true);
+    expect(entityExists(sampleProject, Object.keys(sampleProject.buses)[0])).toBe(true);
+    expect(entityExists(sampleProject, "msg-drive-goal")).toBe(true);
+    expect(entityExists(sampleProject, "navigation")).toBe(true);
+    expect(entityExists(sampleProject, "gone")).toBe(false);
   });
 });
