@@ -142,7 +142,15 @@ export function ProtobufView() {
             project={project}
             entries={byDevice
               .filter((entry) => !deviceFilter || entry.deviceId === deviceFilter)
-              .map((entry) => ({ ...entry, sent: entry.sent.filter((m) => visibleIds.has(m.id)), received: entry.received.filter((m) => visibleIds.has(m.id)) }))}
+              .map((entry) => ({ ...entry, sent: entry.sent.filter((m) => visibleIds.has(m.id)), received: entry.received.filter((m) => visibleIds.has(m.id)) }))
+              .filter((entry) => (direction !== "received" && entry.sent.length > 0) || (direction !== "sent" && entry.received.length > 0))}
+            empty={
+              byDevice.length === 0
+                ? "No message has a sender or receiver yet."
+                : deviceFilter && !needle && direction === "all"
+                  ? `${project.devices[deviceFilter]?.name ?? "This device"} sends and receives no messages.`
+                  : "Nothing matches."
+            }
             direction={direction}
             selectedId={selectedId}
             onSelect={select}
@@ -173,17 +181,19 @@ export function ProtobufView() {
 function MessagesByDevice({
   project,
   entries,
+  empty,
   direction,
   selectedId,
   onSelect,
 }: {
   project: Project;
   entries: DeviceMessages[];
+  empty: string;
   direction: Direction;
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
-  if (entries.length === 0) return <div className="rounded-lg border border-slate-200 bg-white px-4 py-8 text-center text-slate-400">No message has a sender or receiver yet.</div>;
+  if (entries.length === 0) return <div className="rounded-lg border border-slate-200 bg-white px-4 py-8 text-center text-slate-400">{empty}</div>;
   return (
     <div className="grid gap-4 xl:grid-cols-2">
       {entries.map((entry) => (
@@ -315,8 +325,9 @@ function MessageInspector({ message, onClose }: { message: ProtoMessage; onClose
             {message.receivers.length > 0 && (
               <div className="grid grid-cols-[1fr_1fr_20px] items-center gap-1.5">
                 {message.receivers.map((receiver, index) => (
-                  // Imported messages can list the same receiver twice.
-                  <Fragment key={`${index}:${receiver.deviceId}:${receiver.serviceId ?? ""}`}>
+                  // Keyed by position: a key built from the values would remount the row, and
+                  // drop focus, on every change.
+                  <Fragment key={index}>
                     <EndpointPicker
                       project={project}
                       name={`Receiver ${index + 1}`}
