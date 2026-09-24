@@ -134,10 +134,10 @@ the stack decision in `00-tech-stack.md`.
 
 ## Build and release
 
-- GitHub Actions: `ci.yml` runs typecheck, tests and the frontend build on every PR, plus
-  `cargo test` on Linux. `release.yml` builds unsigned installers (universal macOS dmg,
-  Windows NSIS and MSI, Linux AppImage, deb and rpm) with tauri-action when a `v*` tag is
-  pushed and attaches them to a draft release.
+- GitHub Actions: `ci.yml` runs the typecheck, the frontend build and `cargo check` on
+  every PR; `tests.yml` runs the Vitest suite and `cargo test` on Linux. `release.yml`
+  builds unsigned installers (universal macOS dmg, Windows NSIS and MSI, Linux AppImage, deb
+  and rpm) with tauri-action when a `v*` tag is pushed and attaches them to a draft release.
 
 ## Known gaps
 
