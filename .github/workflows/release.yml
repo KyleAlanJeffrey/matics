@@ -11,9 +11,11 @@ on:
 permissions:
   contents: read
 
+# Queued, never replaced, so every push gets its release.
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
+  queue: max
 
 jobs:
   # The release starts as a draft so it only becomes visible once every installer is on it.
@@ -34,6 +36,12 @@ jobs:
         run: |
           version="$(tr -d '[:space:]' < VERSION)"
           tag="v${version}-build.${GITHUB_RUN_NUMBER}"
+          # A re-run keeps its run number, so it reuses the release its first attempt made.
+          id="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases" --jq ".[] | select(.tag_name == \"$tag\") | .id")"
+          if [ -n "$id" ]; then
+            echo "id=$id" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           id="$(gh api "repos/$GITHUB_REPOSITORY/releases" \
             -f tag_name="$tag" \
             -f target_commitish="$GITHUB_SHA" \
