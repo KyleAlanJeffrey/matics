@@ -74,7 +74,8 @@ export function ModbusView({ adding, onAdding }: { adding: boolean; onAdding: (a
       {adding ? (
         <AddMappingForm defaultInterfaceId={current?.id} onCancel={() => onAdding(false)} onSaved={choose} />
       ) : (
-        selected && <MappingInspector key={selected.id} mapping={selected} onClose={() => select(null)} />
+        // Closing keeps the mapping's interface in view: it may not be the one in the URL.
+        selected && <MappingInspector key={selected.id} mapping={selected} onClose={() => pick(selected.interfaceId)} />
       )}
     </div>
   );
