@@ -14,6 +14,22 @@ pub const PACKAGE_EXTENSION: &str = "matics";
 // Unpacked size, so a small file cannot expand into something that fills the disk.
 const MAX_UNPACKED_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const MAX_PROJECT_BYTES: u64 = 200 * 1024 * 1024;
+// Every collection a project holds; packages from older builds lack some and are refused.
+// src/model/project-shape.ts checks the same list for folders and JSON imports.
+const RECORD_FIELDS: [&str; 13] = [
+    "presets", "devices", "buses", "zones", "connections", "bundles", "freeWires", "images", "documents", "notes", "frames", "messages", "sketches",
+];
+
+fn missing_fields(project: &serde_json::Value) -> Vec<&'static str> {
+    let mut missing: Vec<&'static str> = RECORD_FIELDS.into_iter().filter(|field| !project.get(field).is_some_and(|v| v.is_object())).collect();
+    if !project.get("docLinks").is_some_and(|v| v.is_array()) {
+        missing.push("docLinks");
+    }
+    if !project.get("name").is_some_and(|v| v.is_string()) {
+        missing.push("name");
+    }
+    missing
+}
 
 type CmdResult<T> = Result<T, String>;
 
@@ -87,10 +103,17 @@ pub fn import_package(path: String, root: String) -> CmdResult<String> {
         return Err("The package's project.json is too large.".into());
     }
     let project: serde_json::Value = serde_json::from_str(&project_json).map_err(|_| "The package's project.json is not valid.".to_string())?;
-    if !project.get("devices").is_some_and(|d| d.is_object()) {
+    let missing = missing_fields(&project);
+    if RECORD_FIELDS.iter().all(|field| missing.contains(field)) {
         return Err("The package's project.json is not a Matics project.".into());
     }
-    let name = project.get("name").and_then(|v| v.as_str()).unwrap_or("Imported project");
+    if !missing.is_empty() {
+        return Err(format!(
+            "The package is missing {}. It was made by an older Matics build, which this version cannot open.",
+            missing.join(", ")
+        ));
+    }
+    let name = project.get("name").and_then(|v| v.as_str()).unwrap_or_default();
 
     let dir = new_project_dir(root, name.to_string())?;
     let result = unpack(&mut archive, Path::new(&dir), &project_json);
@@ -169,20 +192,35 @@ mod tests {
         assert_eq!(asset_file_name("other/x"), None);
     }
 
-    #[test]
-    fn a_package_without_a_project_is_refused() {
-        let base = std::env::temp_dir().join(format!("dm-package-bad-{}", std::process::id()));
+    const COMPLETE_PROJECT: &str = r#"{"id":"p1","name":"Round trip","presets":{},"devices":{},"buses":{},"zones":{},"connections":{},"bundles":{},"freeWires":{},"images":{},"documents":{},"docLinks":[],"notes":{},"frames":{},"messages":{},"sketches":{}}"#;
+
+    fn import_error(name: &str, project_json: &str) -> String {
+        let base = std::env::temp_dir().join(format!("dm-package-{name}-{}", std::process::id()));
         fs::create_dir_all(&base).unwrap();
         let package = base.join("bad.matics");
         let mut zip = ZipWriter::new(File::create(&package).unwrap());
         zip.start_file(PROJECT_FILE, SimpleFileOptions::default()).unwrap();
-        zip.write_all(br#"{"name":"Not a project"}"#).unwrap();
+        zip.write_all(project_json.as_bytes()).unwrap();
         zip.finish().unwrap();
         let root = base.join("root");
         fs::create_dir_all(&root).unwrap();
-        assert!(import_package(package.to_string_lossy().into(), root.to_string_lossy().into()).is_err());
+        let error = import_package(package.to_string_lossy().into(), root.to_string_lossy().into()).unwrap_err();
         assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
         fs::remove_dir_all(&base).unwrap();
+        error
+    }
+
+    #[test]
+    fn a_package_without_a_project_is_refused() {
+        assert!(import_error("none", r#"{"name":"Not a project"}"#).contains("not a Matics project"));
+    }
+
+    #[test]
+    fn a_package_from_an_older_build_names_what_it_lacks() {
+        let older = COMPLETE_PROJECT.replace(r#","messages":{},"sketches":{}"#, "");
+        assert!(import_error("older", &older).contains("missing messages, sketches."));
+        let unnamed = COMPLETE_PROJECT.replace(r#""name":"Round trip","#, "");
+        assert!(import_error("unnamed", &unnamed).contains("missing name."));
     }
 
     #[test]
@@ -190,7 +228,7 @@ mod tests {
         let base = std::env::temp_dir().join(format!("dm-package-{}", std::process::id()));
         let project = base.join("source");
         fs::create_dir_all(project.join(ASSETS_DIR)).unwrap();
-        fs::write(project.join(PROJECT_FILE), r#"{"id":"p1","name":"Round trip","devices":{}}"#).unwrap();
+        fs::write(project.join(PROJECT_FILE), COMPLETE_PROJECT).unwrap();
         fs::write(project.join(ASSETS_DIR).join("pic.png"), b"png-bytes").unwrap();
         let package = base.join("out.matics");
         export_package(project.to_string_lossy().into(), package.to_string_lossy().into()).unwrap();
@@ -200,7 +238,7 @@ mod tests {
         let dir = import_package(package.to_string_lossy().into(), root.to_string_lossy().into()).unwrap();
         let dir = Path::new(&dir);
         assert!(dir.ends_with("round-trip"));
-        assert_eq!(fs::read_to_string(dir.join(PROJECT_FILE)).unwrap(), r#"{"id":"p1","name":"Round trip","devices":{}}"#);
+        assert_eq!(fs::read_to_string(dir.join(PROJECT_FILE)).unwrap(), COMPLETE_PROJECT);
         assert_eq!(fs::read(dir.join(ASSETS_DIR).join("pic.png")).unwrap(), b"png-bytes");
         fs::remove_dir_all(&base).unwrap();
     }

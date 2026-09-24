@@ -29,6 +29,7 @@ import {
   type Zone,
 } from "@/model/types";
 import { sampleProject } from "@/model/sample-project";
+import { assertCompleteProject } from "@/model/project-shape";
 import { resolveWikiTarget } from "@/model/derived";
 import { renameWikiLinks } from "@/model/markdown";
 import { busGeometry, DEFAULT_BUS_LENGTH } from "@/views/diagram/to-flow";
@@ -329,15 +330,26 @@ export const useProjectStore = create<ProjectState>()(
             state.loadError = null;
           });
           let { projects: index, currentId } = await storage.init();
-          let project = currentId ? await storage.load(currentId) : undefined;
-          if (!project) {
-            project =
-              index.length > 0 ? await storage.load(index[0].id) : undefined;
+          // A project that cannot be opened (one saved by an older build) is skipped, so
+          // it cannot keep the app from starting; the others still open.
+          const candidates = [...new Set([currentId, ...index.map((m) => m.id)])].filter((id): id is string => !!id);
+          const skipped: string[] = [];
+          let project: Project | undefined;
+          for (const id of candidates) {
+            try {
+              project = await storage.load(id);
+            } catch (error) {
+              skipped.push(error instanceof Error ? error.message : String(error));
+            }
+            if (project) break;
           }
+          if (skipped.length > 0) setTimeout(() => window.alert(skipped.join("\n\n")));
           if (!project) {
             project = structuredClone(sampleProject);
             await storage.save(project);
-            index = [withDir(meta(project))];
+            const sample = withDir(meta(project));
+            // Keep the skipped projects; the browser build would otherwise lose them from its index.
+            index = [...index.filter((m) => m.id !== sample.id), sample];
             await storage.updateIndex(index);
           }
           await storage.setCurrent(project.id);
@@ -469,6 +481,7 @@ export const useProjectStore = create<ProjectState>()(
         const parsed = await readJsonFile<ProjectFile>(file);
         if (parsed.kind !== "diagram-maker-project" || !parsed.project)
           throw new Error("Not a diagram-maker project file");
+        assertCompleteProject(parsed.project, "That file");
         const project = { ...parsed.project, id: newId("project") };
         await adoptProject(project, set, get);
       },

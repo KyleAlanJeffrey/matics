@@ -55,9 +55,38 @@ export const desktop = {
   fileUrl: (absolutePath: string) => convertFileSrc(absolutePath),
 };
 
+export type DesktopPlatform = "mac" | "windows" | "linux";
+
+export function desktopPlatform(): DesktopPlatform | null {
+  if (!isDesktop()) return null;
+  const agent = navigator.userAgent;
+  return agent.includes("Mac") ? "mac" : agent.includes("Windows") ? "windows" : "linux";
+}
+
 // The macOS app draws its own title bar: the window controls float over the app header.
 export function hasOverlayTitleBar() {
-  return isDesktop() && navigator.userAgent.includes("Mac");
+  return desktopPlatform() === "mac";
+}
+
+// Only macOS has a native menu bar (src-tauri/src/lib.rs); elsewhere the header shows the
+// in-app File menu and the page handles the menu shortcuts.
+export function hasNativeMenu() {
+  return desktopPlatform() === "mac";
+}
+
+// Windows has no native title bar (tauri.windows.conf.json), so the header draws the
+// window buttons.
+export function drawsWindowControls() {
+  return desktopPlatform() === "windows";
+}
+
+export function fileManagerName() {
+  const platform = desktopPlatform();
+  return platform === "mac" ? "Finder" : platform === "windows" ? "File Explorer" : "the file manager";
+}
+
+export function trashName() {
+  return desktopPlatform() === "windows" ? "Recycle Bin" : "Trash";
 }
 
 export function joinPath(dir: string, rel: string) {

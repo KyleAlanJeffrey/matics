@@ -2,8 +2,9 @@ import { useState } from "react";
 import { ChevronDown, Copy, FilePlus2, FolderOpen, Package, PackageOpen, Pencil, Trash2 } from "lucide-react";
 import { useProjectStore } from "@/store/project-store";
 import { sampleProject } from "@/model/sample-project";
-import { entryDate, isDesktop } from "@/lib/desktop";
-import { MenuHeading, MenuItem, MenuSeparator, useDropdown } from "./Menu";
+import { entryDate, fileManagerName, isDesktop, trashName } from "@/lib/desktop";
+import { reportErrors } from "@/lib/commands";
+import { MenuHeading, MenuItem, MenuPanel, MenuSeparator, useDropdown } from "./Menu";
 
 export function ProjectMenu() {
   const {
@@ -60,7 +61,7 @@ export function ProjectMenu() {
   };
 
   const onDelete = async () => {
-    const warning = isDesktop() ? `Move "${project.name}" to the Trash?` : `Delete "${project.name}"? This cannot be undone.`;
+    const warning = isDesktop() ? `Move "${project.name}" to the ${trashName()}?` : `Delete "${project.name}"? This cannot be undone.`;
     if (!window.confirm(warning)) return;
     await deleteProject(project.id);
     setOpen(false);
@@ -84,23 +85,23 @@ export function ProjectMenu() {
         <button
           onClick={() => setOpen((o) => !o)}
           onDoubleClick={startRename}
-          className="flex items-center gap-1 rounded-md px-2 py-1.5 text-[15px] font-semibold text-white hover:bg-white/10"
+          className="flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1.5 text-[15px] font-semibold text-white hover:bg-white/10"
           title="Switch or manage diagrams (double-click to rename)"
         >
-          {project.name}
+          <span className="max-w-[160px] truncate xl:max-w-[240px]">{project.name}</span>
           <ChevronDown className="h-4 w-4 text-white/60" />
         </button>
       )}
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+        <MenuPanel>
           <MenuHeading>Diagrams</MenuHeading>
           <div className="max-h-64 overflow-y-auto">
             {projects.map((entry) => (
               <button
                 key={entry.id}
                 onClick={() => {
-                  void switchProject(entry.id);
+                  void reportErrors(() => switchProject(entry.id));
                   setOpen(false);
                 }}
                 className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left ${
@@ -120,20 +121,21 @@ export function ProjectMenu() {
           <MenuItem icon={Copy} label="Duplicate" onClick={() => void duplicateProject().then(() => setOpen(false))} />
           {isDesktop() && (
             <>
-              <MenuItem icon={FolderOpen} label="Show in Finder" hint={projectDir ? shortPath(projectDir) : undefined} onClick={() => void revealProject().then(() => setOpen(false))} />
+              <MenuItem icon={FolderOpen} label={`Show in ${fileManagerName()}`} hint={projectDir ? shortPath(projectDir) : undefined} onClick={() => void revealProject().then(() => setOpen(false))} />
               <MenuItem icon={Package} label="Package as .matics..." onClick={() => runAndClose(packageProject)} />
               <MenuItem icon={PackageOpen} label="Open .matics package..." onClick={() => runAndClose(openPackage)} />
             </>
           )}
           <MenuSeparator />
-          <MenuItem icon={Trash2} label={isDesktop() ? "Move diagram to Trash" : "Delete diagram"} danger onClick={onDelete} />
-        </div>
+          <MenuItem icon={Trash2} label={isDesktop() ? `Move diagram to ${trashName()}` : "Delete diagram"} danger onClick={onDelete} />
+        </MenuPanel>
       )}
     </div>
   );
 }
 
 function shortPath(path: string) {
-  const parts = path.split("/").filter(Boolean);
-  return parts.length > 2 ? `.../${parts.slice(-2).join("/")}` : path;
+  const separator = path.includes("\\") ? "\\" : "/";
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  return parts.length > 2 ? `...${separator}${parts.slice(-2).join(separator)}` : path;
 }

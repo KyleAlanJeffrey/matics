@@ -1,3 +1,6 @@
+// Only macOS gets a native menu bar. Windows and Linux use the in-app File menu, since a
+// window menu there would stack a second bar between the title bar and the app header.
+#[cfg(target_os = "macos")]
 mod menu;
 mod package;
 mod storage;
@@ -7,10 +10,15 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
-            let menu = menu::build(app.handle())?;
-            app.set_menu(menu)?;
-            app.on_menu_event(|app, event| menu::forward(app, event.id().as_ref()));
+            #[cfg(target_os = "macos")]
+            {
+                let menu = menu::build(app.handle())?;
+                app.set_menu(menu)?;
+                app.on_menu_event(|app, event| menu::forward(app, event.id().as_ref()));
+            }
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()

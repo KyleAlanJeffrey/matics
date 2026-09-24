@@ -8,18 +8,30 @@ the stack decision in `00-tech-stack.md`.
 - Pages: Diagram (`/schematic`), Documentation (`/notes`), Communications
   (`/communications`), Sketches (`/sketches`) and Report (`/report`). Selection lives in the
   URL (`?selected=id`), so moving between pages keeps it.
-- The desktop app has a native menu bar (`src-tauri/src/menu.rs`). File holds project,
-  import/export and report items; View switches pages (Cmd+1 to Cmd+5); Edit and Window are
-  the platform's own items so text fields keep copy, paste and undo. Custom items emit a
-  "menu" event handled in `src/lib/native-menu.ts`. WKWebView offers key equivalents to the
-  page first, so the page's Cmd+S and Cmd+Z handlers still run while it has focus.
+- Menu commands live in `src/lib/commands.ts` and run from three places. On macOS, the
+  native menu bar (`src-tauri/src/menu.rs`) emits a "menu" event that
+  `src/lib/native-menu.ts` passes on. Windows, Linux and the browser build show the in-app
+  File menu in the header (`FileMenu.tsx`) instead, and on the desktop the page handles
+  the menu shortcuts itself (Ctrl+N, Ctrl+O, Ctrl+1 to Ctrl+5 ...). A window menu there
+  would stack a second bar between the title bar and the header. On macOS, Edit and Window
+  are the platform's own items so text fields keep copy, paste and undo. WKWebView offers
+  key equivalents to the page first, so the page's Cmd+S and Cmd+Z handlers still run
+  while it has focus.
 - Imports use the native open panel plus `read_import_file` (a file input cannot be opened
   from a menu click, which is not a user gesture); exports use the native save panel plus
-  `write_export_file`. The browser dev build has no native menu and shows an in-app File
-  menu instead.
-- The macOS window has no native title bar (`titleBarStyle: "Overlay"`). The charcoal app
-  header is a `data-tauri-drag-region` and the traffic lights sit in its left inset.
-  Windows and Linux keep the native bar.
+  `write_export_file`.
+- The charcoal app header is the title bar: a `data-tauri-drag-region`, double-click to
+  maximize. On macOS the traffic lights sit in its left inset (`titleBarStyle:
+  "Overlay"`). On Windows the window has no decorations (`tauri.windows.conf.json`) and
+  the header draws minimize, maximize and close (`WindowControls.tsx`); close saves first.
+  Linux keeps the native bar. Below 1280 px (1536 on Windows) the header drops the
+  wordmark, the "Saved" text and the update version so everything fits on one row.
+- Updates: `src/lib/updates.ts` checks the latest GitHub release's `latest.json` five
+  seconds after launch and every six hours (never in `tauri dev`); Check for Updates in the
+  menu asks right away. A newer version shows an Update button in the header. Installing
+  downloads and verifies the update, saves the project (the Windows installer closes the
+  app as soon as it starts), installs and relaunches. Updates are signed; the public key
+  is in `tauri.conf.json` and the private key is a repository secret.
 - Light theme only. Charcoal header, safety orange for primary actions and the active tab,
   warm neutrals, Manrope and IBM Plex Mono.
 - Cursor language: pointer means click, grab means drag to move, crosshair means drag out a
@@ -136,10 +148,12 @@ the stack decision in `00-tech-stack.md`.
 
 - GitHub Actions: `ci.yml` runs the typecheck, the frontend build and `cargo check` on
   every PR; `tests.yml` runs the Vitest suite and `cargo test` on Linux. `release.yml`
-  builds unsigned installers (universal macOS dmg, Windows NSIS and MSI, Linux AppImage, deb
-  and rpm) with tauri-action on every push to main and publishes them as a release tagged
-  `v<VERSION>-build.<run>`. The release is created as a draft and published only after all
-  three platforms upload, so the latest release always has every installer.
+  builds installers (universal macOS dmg, Windows NSIS and MSI, Linux AppImage, deb and
+  rpm) with tauri-action on every push to main and publishes them as release
+  `v<major>.<minor>.<run>`. The installers are not code signed; the update bundles are
+  signed for the updater. The release is created as a draft; the publish job writes
+  `latest.json` once every platform has uploaded (tauri-action's own merge could drop an
+  entry when builds finish together) and then publishes it as the latest release.
 
 ## Known gaps
 

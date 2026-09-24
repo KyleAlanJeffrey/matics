@@ -24,6 +24,16 @@ export function useDropdown() {
   return { open, setOpen, ref };
 }
 
+// Menus open from the dark app header, so the panel sets its own text color rather than
+// inheriting the header's white.
+export function MenuPanel({ children, align = "left" }: { children: React.ReactNode; align?: "left" | "right" }) {
+  return (
+    <div className={`absolute top-full z-50 mt-1 w-72 rounded-lg border border-slate-200 bg-white p-1 text-slate-800 shadow-lg ${align === "left" ? "left-0" : "right-0"}`}>
+      {children}
+    </div>
+  );
+}
+
 export function MenuItem({
   icon: Icon,
   label,

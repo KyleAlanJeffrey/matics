@@ -5,11 +5,15 @@ import { AlertTriangle, Check, Redo2, Undo2 } from "lucide-react";
 import { useProjectStore } from "@/store/project-store";
 import { useSelection } from "@/lib/selection";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { hasOverlayTitleBar, isDesktop } from "@/lib/desktop";
+import { drawsWindowControls, hasNativeMenu, hasOverlayTitleBar, isDesktop } from "@/lib/desktop";
 import { MaticsLogo } from "./MaticsLogo";
 import { ProjectMenu } from "./ProjectMenu";
 import { FileMenu } from "./FileMenu";
+import { UpdateNotice } from "./UpdateNotice";
+import { WindowControls } from "./WindowControls";
 import { useNativeMenu } from "@/lib/native-menu";
+import { useCommands, useCommandShortcuts } from "@/lib/commands";
+import { watchForUpdates } from "@/lib/updates";
 import { fieldHandles, inSketchCanvas, stepProjectHistory } from "@/lib/editing";
 
 const navItems = [
@@ -31,6 +35,26 @@ function useTrafficLightInset() {
     return () => void unlisten.then((stop) => stop());
   }, []);
   return inset;
+}
+
+// Autosave waits a moment after each edit, so every way of closing the window (the close
+// button, Alt+F4, Cmd+W, the taskbar) saves first, and asks before dropping a failed save.
+function useSaveBeforeClose() {
+  useEffect(() => {
+    if (!isDesktop()) return;
+    const unlisten = getCurrentWindow().onCloseRequested(async (event) => {
+      await useProjectStore.getState().saveNow();
+      const error = useProjectStore.getState().saveError;
+      if (error && !window.confirm(`Your latest changes could not be saved (${error}). Close anyway?`)) event.preventDefault();
+    });
+    return () => void unlisten.then((stop) => stop());
+  }, []);
+}
+
+// Windows fits two more things in the header (the File menu and the window buttons), so
+// its labels stay short up to a wider window. Class names are written out for Tailwind.
+function wideOnly() {
+  return drawsWindowControls() ? "hidden 2xl:inline" : "hidden xl:inline";
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -58,7 +82,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (savedTimer.current) clearTimeout(savedTimer.current);
     savedTimer.current = setTimeout(() => setJustSaved(false), 1600);
   }, [saveNow]);
-  useNativeMenu(save);
+  const run = useCommands(save);
+  useNativeMenu(run);
+  useCommandShortcuts(run);
+  useEffect(watchForUpdates, []);
+  useSaveBeforeClose();
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -66,7 +94,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       if (!mod) return;
       const key = event.key.toLowerCase();
       // Save works from inside text fields too, and keeps the browser's save dialog away.
-      if (key === "s") {
+      // Shift+S packages the project instead.
+      if (key === "s" && !event.shiftKey) {
         event.preventDefault();
         void save();
         return;
@@ -85,25 +114,28 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-full flex-col">
       {/* The header doubles as the window title bar: drag it to move, double-click to zoom. */}
-      <header data-tauri-drag-region className={`flex h-14 shrink-0 select-none items-center gap-3 bg-charcoal pr-5 text-white ${useTrafficLightInset() ? "pl-[104px]" : "pl-5"}`}>
-        <MaticsLogo inverse />
+      <header
+        data-tauri-drag-region
+        className={`flex h-14 shrink-0 select-none items-center gap-2 bg-charcoal text-white xl:gap-3 ${useTrafficLightInset() ? "pl-[104px]" : "pl-5"} ${drawsWindowControls() ? "pr-0" : "pr-5"}`}
+      >
+        <MaticsLogo inverse wordmarkClass="hidden xl:inline" />
         <span className="h-6 w-px bg-white/20" />
         <ProjectMenu />
-        {/* The desktop app has these in the native menu bar. */}
-        {!isDesktop() && <FileMenu onSave={() => void save()} />}
-        <nav className="mx-auto flex h-full gap-2">
+        {!hasNativeMenu() && <FileMenu run={run} />}
+        <nav className="mx-auto flex h-full shrink-0 gap-1 xl:gap-2">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={selectedId ? `${item.to}?selected=${selectedId}` : item.to}
               className={({ isActive }) =>
-                `flex items-center border-b-[3px] px-4 pt-[3px] text-[15px] font-semibold ${isActive ? "border-brand text-white" : "border-transparent text-white/70 hover:text-white"}`
+                `flex items-center whitespace-nowrap border-b-[3px] px-3 pt-[3px] text-[15px] font-semibold xl:px-4 ${isActive ? "border-brand text-white" : "border-transparent text-white/70 hover:text-white"}`
               }
             >
               {item.label}
             </NavLink>
           ))}
         </nav>
+        <UpdateNotice versionClass={wideOnly()} />
         <div className="flex items-center gap-1">
           <button
             className="rounded-md p-1.5 text-white/80 hover:bg-white/10 disabled:opacity-30"
@@ -123,15 +155,16 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
         </div>
         {saveError ? (
-          <div className="flex items-center gap-1 text-red-300" title={saveError}>
+          <div className="flex shrink-0 items-center gap-1 whitespace-nowrap text-red-300" title={saveError}>
             <AlertTriangle className="h-4 w-4" /> Not saved
           </div>
         ) : (
-          <div className="flex items-center gap-1.5 text-white/75" title={projectDir ?? undefined}>
+          <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-white/75" title={projectDir ?? (isDesktop() ? "Saved to folder" : "Saved in browser")}>
             <Check className="h-4 w-4 text-white" />
-            <span className={justSaved ? "font-semibold text-white" : undefined}>{justSaved ? "Saved" : isDesktop() ? "Saved to folder" : "Saved in browser"}</span>
+            <span className={justSaved ? "font-semibold text-white" : wideOnly()}>{justSaved ? "Saved" : isDesktop() ? "Saved to folder" : "Saved in browser"}</span>
           </div>
         )}
+        {drawsWindowControls() && <WindowControls />}
       </header>
       <main className="min-h-0 flex-1">{children}</main>
     </div>
