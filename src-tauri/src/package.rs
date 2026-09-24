@@ -186,10 +186,17 @@ pub fn files_opened(app: &AppHandle, urls: Vec<tauri::Url>) {
     queue_opened(app, urls.into_iter().filter_map(|url| url.to_file_path().ok()));
 }
 
-/// Windows and Linux start the app with the double-clicked project as an argument.
+/// Windows and Linux pass a double-clicked project as a command-line argument: to this
+/// process at launch, or to the running one through the single-instance plugin.
 #[cfg_attr(target_os = "macos", allow(dead_code))]
-pub fn opened_at_launch(app: &AppHandle) {
-    queue_opened(app, std::env::args_os().skip(1).map(PathBuf::from));
+pub fn opened_from_args(app: &AppHandle, args: impl Iterator<Item = PathBuf>, cwd: Option<&Path>) {
+    queue_opened(app, absolute_paths(args, cwd).into_iter());
+}
+
+// An opened folder is remembered by its path, so a relative one would break on the next
+// launch from somewhere else. Without a working directory, relative paths are dropped.
+fn absolute_paths(args: impl Iterator<Item = PathBuf>, cwd: Option<&Path>) -> Vec<PathBuf> {
+    args.filter_map(|path| if path.is_absolute() { Some(path) } else { cwd.map(|cwd| cwd.join(path)) }).collect()
 }
 
 #[tauri::command]
@@ -200,6 +207,15 @@ pub fn take_opened_files(opened: tauri::State<OpenedFiles>) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn command_line_paths_are_made_absolute() {
+        let cwd = std::env::temp_dir();
+        let absolute = cwd.join("a.matics");
+        let args = || [absolute.clone(), PathBuf::from("b.matics")].into_iter();
+        assert_eq!(absolute_paths(args(), Some(&cwd)), [absolute.clone(), cwd.join("b.matics")]);
+        assert_eq!(absolute_paths(args(), None), [absolute.clone()]);
+    }
 
     #[test]
     fn only_flat_asset_entries_unpack() {

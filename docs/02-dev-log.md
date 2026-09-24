@@ -68,7 +68,9 @@ the stack decision in `00-tech-stack.md`.
   `assets/`). A compressed file opens as a new project from Finder or File > Open
   Compressed Project; a `.matics` folder opens in place (`open_project_path` decides which).
   Projects handed to the app at launch (Finder on macOS, the command line on Windows and
-  Linux) are queued in Rust until the webview asks for them. Unpacking is bounded in size
+  Linux) are queued in Rust until the webview asks for them. On Windows and Linux,
+  `tauri-plugin-single-instance` passes a second launch's arguments to the running app,
+  so two copies never write `config.json` at once. Unpacking is bounded in size
   and validates the project before it is written.
 
 ## Undo

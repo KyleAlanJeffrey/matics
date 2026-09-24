@@ -7,7 +7,19 @@ mod storage;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // Registered first, as the plugin requires. A project double-clicked while the app runs
+    // opens in this window instead of a second copy whose config writes would race these.
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+        let args = args.into_iter().skip(1).map(std::path::PathBuf::from);
+        package::opened_from_args(app, args, Some(std::path::Path::new(&cwd)));
+        if let Some(window) = tauri::Manager::get_webview_window(app, "main") {
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        }
+    }));
+    builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
@@ -20,7 +32,11 @@ pub fn run() {
                 app.on_menu_event(|app, event| menu::forward(app, event.id().as_ref()));
             }
             #[cfg(not(target_os = "macos"))]
-            package::opened_at_launch(app.handle());
+            package::opened_from_args(
+                app.handle(),
+                std::env::args_os().skip(1).map(std::path::PathBuf::from),
+                std::env::current_dir().ok().as_deref(),
+            );
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
