@@ -83,7 +83,7 @@ package.
 3. **Wire them up.** Add a **Bus** for each shared network (CAN, Ethernet), then drag
    from a port tab on a card to a bus or to another port.
 4. **Document as you go.** Select a device and open **Details**, or switch to
-   **Documentation** (Cmd+2). Link datasheets, write notes and add services.
+   **Documentation** (Cmd+2). Attach PDFs, link datasheets, write notes and add services.
 5. **Describe the traffic.** In **I/O** (Cmd+3), import an `IoMap.iom` or map channels
    by hand. In **Communications** (Cmd+4), import a DBC or `.proto` file, then set who
    sends and receives each message.
