@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- macOS icon grid: 824px tile inside the 1024px canvas. Mark from src/components/MaticsLogo.tsx. -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="#22262a"/>
+  <g transform="translate(282 307) scale(10)">
+    <g fill="#f26a21">
+      <rect x="0" y="0" width="24" height="13" rx="1.6"/>
+      <rect x="0" y="0" width="15" height="18.5" rx="1.6"/>
+      <rect x="0" y="22.5" width="15" height="18.5" rx="1.6"/>
+      <rect x="0" y="28" width="24" height="13" rx="1.6"/>
+    </g>
+    <g fill="#ffffff">
+      <rect x="17.5" y="15.5" width="10" height="10" rx="1.2"/>
+      <rect x="30" y="4" width="16" height="33" rx="1.6"/>
+    </g>
+  </g>
+</svg>

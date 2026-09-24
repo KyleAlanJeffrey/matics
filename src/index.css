@@ -1,0 +1,415 @@
+@import "tailwindcss";
+
+/* Matics design language. The slate scale is the
+   app's neutral scale throughout, so it is tuned to the Matics charcoal and concrete
+   neutrals here rather than renamed in every component. */
+@theme {
+  --font-sans: "Manrope Variable", "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-slate-50: #f5f5f2;
+  --color-slate-100: #eeeeeb;
+  --color-slate-200: #e1e2df;
+  --color-slate-300: #d0d2cf;
+  --color-slate-400: #a2a7ab;
+  --color-slate-500: #7a8086;
+  --color-slate-600: #626970;
+  --color-slate-700: #464c52;
+  --color-slate-800: #30353a;
+  --color-slate-900: #22262a;
+  --color-slate-950: #181b1e;
+
+  /* Safety orange fills; charcoal text sits on it. Orange ink is for text and links. */
+  --color-brand: #f26a21;
+  --color-brand-hover: #e05a12;
+  --color-brand-ink: #a63b0a;
+  --color-brand-wash: #fff1e8;
+  --color-brand-line: #f9c7a8;
+  --color-charcoal: #22262a;
+  --color-concrete: #e9e9e6;
+  --color-canvas: #f5f5f2;
+}
+
+:root {
+  --color-panel: #ffffff;
+  --color-border: #d8dad7;
+  --color-text: #22262a;
+  --color-muted: #626970;
+  --color-accent: #f26a21;
+  --color-accent-soft: #fff1e8;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Cursor language: pointer = click, move = drag an object (as in draw.io), grab = pan
+   the canvas, crosshair = drag out a wire, arrow = nothing here, not-allowed = disabled.
+   Tailwind 4 resets buttons to the arrow. */
+button:not(:disabled),
+[role="button"],
+summary,
+select:not(:disabled),
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled),
+input[type="file"]:not(:disabled),
+label:has(> input[type="checkbox"]:not(:disabled)) {
+  cursor: pointer;
+}
+
+:disabled {
+  cursor: not-allowed;
+}
+
+.diagram-canvas {
+  background: var(--color-canvas);
+  /* A box select also drags a WebKit text selection across the cards, which paints
+     large blue blocks that linger after the drag. */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Selected nodes already show their own outline; the extra bounding box reads as an object. */
+.diagram-canvas .react-flow__nodesselection-rect {
+  display: none;
+}
+
+/* React Flow shows a pointer over the empty canvas in select mode, which makes blank
+   space look clickable. On the diagram, empty canvas is the arrow unless panning. */
+.diagram-canvas .react-flow__pane,
+.diagram-canvas .react-flow__pane.selection,
+.diagram-canvas .react-flow__pane.draggable {
+  cursor: default;
+}
+
+.diagram-canvas.pan-tool .react-flow__pane {
+  cursor: grab;
+}
+
+.diagram-canvas .react-flow__pane.dragging {
+  cursor: grabbing;
+}
+
+/* Objects on the schematic show the four-way move arrow, before and during a drag. */
+.diagram-canvas .react-flow__node.draggable,
+.diagram-canvas .react-flow__node.draggable.dragging,
+.react-flow__node-zone .zone-title {
+  cursor: move;
+}
+
+.diagram-canvas.wire-tool .react-flow__pane,
+.diagram-canvas.wire-tool .react-flow__node {
+  cursor: crosshair;
+}
+
+.react-flow__node {
+  font-size: 12px;
+}
+
+/* A zone is grabbed by its title only. Its body lets presses through to the canvas, so
+   a press that just misses a port does not select or drag the whole zone. React Flow's
+   node wrapper sets pointer-events inline, hence !important. */
+.react-flow__node.react-flow__node-zone {
+  pointer-events: none !important;
+}
+
+.react-flow__node-zone .zone-title {
+  pointer-events: auto;
+}
+
+.react-flow__node-zone .react-flow__resize-control {
+  pointer-events: auto;
+}
+
+/* Overview cards: a port is a small tab peeking out from under the card edge. The handle
+   is the tab, so wires meet its outer end. Its inner end hides under the card. */
+.react-flow__handle.edge-tab {
+  height: 14px;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--handle-color, #64748b) 45%, white);
+  border-radius: 3px;
+  background: #fbfbf9;
+  transform: translateY(-50%);
+  z-index: -1;
+}
+
+.react-flow__handle.edge-tab:not(.connected) {
+  border-style: dashed;
+}
+
+.react-flow__handle.edge-tab:hover {
+  border-color: var(--handle-color, #64748b);
+  background: white;
+}
+
+/* The sketchpad (Excalidraw) takes the Matics accent and app font for its own UI. */
+.excalidraw.theme--light {
+  --color-primary: #f26a21;
+  --color-primary-darker: #e05a12;
+  --color-primary-darkest: #a63b0a;
+  --color-primary-hover: #e05a12;
+  --color-primary-light: #fde3d3;
+  --color-surface-primary-container: #fde3d3;
+  --ui-font: var(--font-sans);
+}
+
+.react-flow__edge.selected .wire-path {
+  stroke-width: 5;
+}
+
+/* While drawing a free wire every click belongs to the canvas. */
+.react-flow.wire-tool .react-flow__node,
+.react-flow.wire-tool .react-flow__node > *,
+.react-flow.wire-tool .react-flow__node-zone .zone-title,
+.react-flow.wire-tool .react-flow__edges,
+.react-flow.wire-tool .react-flow__viewport-portal svg g {
+  pointer-events: none !important;
+}
+
+.input {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 13px;
+  background: var(--color-panel);
+}
+
+.input:focus {
+  outline: 2px solid var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.react-flow__handle.graph-handle {
+  left: 50%;
+  top: 50%;
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  min-height: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+/* Notes: CodeMirror with an Obsidian-style live preview (views/notes/live-preview.ts). */
+.note-editor .cm-editor {
+  font-size: 15px;
+  line-height: 1.65;
+  color: #1e293b;
+}
+
+.note-editor .cm-editor.cm-focused {
+  outline: none;
+}
+
+.note-editor .cm-scroller {
+  font-family: inherit;
+  overflow: visible;
+}
+
+.note-editor .cm-content {
+  padding: 4px 0 48px;
+  caret-color: #2563eb;
+}
+
+.note-editor .cm-line {
+  padding: 1px 0;
+}
+
+.note-editor .cm-placeholder {
+  color: #94a3b8;
+}
+
+.note-editor .cm-md-h1,
+.note-editor .cm-md-h2,
+.note-editor .cm-md-h3,
+.note-editor .cm-md-h4 {
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.note-editor .cm-md-h1 {
+  font-size: 1.75em;
+}
+
+.note-editor .cm-md-h2 {
+  font-size: 1.35em;
+  padding-bottom: 0.1em;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 0.3em;
+}
+
+.note-editor .cm-md-h3 {
+  font-size: 1.1em;
+  color: #334155;
+}
+
+.note-editor .cm-md-mark {
+  color: #94a3b8;
+}
+
+/* Wrapped list lines line up with the text, not the marker. */
+.note-editor .cm-md-li {
+  padding-left: 1.4em;
+  text-indent: -1.4em;
+}
+
+.note-editor .cm-md-bullet {
+  display: inline-block;
+  width: 1.1em;
+  text-indent: 0;
+  color: #64748b;
+}
+
+.note-editor .cm-md-checkbox {
+  margin: 0 0.45em 0 0;
+  vertical-align: -1px;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
+.note-editor .cm-md-done {
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+
+.note-editor .cm-md-quote {
+  padding-left: 14px;
+  box-shadow: inset 2px 0 0 #cbd5e1;
+  color: #475569;
+}
+
+.note-editor .cm-md-codeblock {
+  padding-inline: 12px;
+  background: #f1f5f9;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+}
+
+.note-editor .cm-md-inline-code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88em;
+  color: #be123c;
+}
+
+.note-editor .cm-md-rule {
+  display: inline-block;
+  width: 100%;
+  vertical-align: middle;
+  border-top: 1px solid #e2e8f0;
+}
+
+.note-editor .cm-md-link {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.note-editor .cm-md-url {
+  color: #64748b;
+}
+
+.note-editor .cm-md-wiki-source {
+  color: #7c3aed;
+}
+
+.note-editor .cm-editor .cm-tooltip {
+  border: none;
+  background: transparent;
+}
+
+.note-editor .cm-editor .cm-tooltip-autocomplete {
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+  font-size: 13px;
+}
+
+.note-editor .cm-editor .cm-tooltip-autocomplete > ul {
+  font-family: inherit;
+}
+
+.note-editor .cm-editor .cm-tooltip-autocomplete > ul > li {
+  padding: 4px 10px;
+}
+
+.note-editor .cm-editor .cm-tooltip-autocomplete > ul > li[aria-selected] {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.note-editor .cm-editor .cm-completionDetail {
+  margin-left: 8px;
+  font-style: normal;
+  color: #94a3b8;
+}
+
+/* Wiki links look like Obsidian internal links. */
+.wiki-link {
+  color: #7c3aed;
+  text-decoration: none;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+.wiki-link:hover {
+  text-decoration: underline;
+  background: #f5f3ff;
+}
+
+.wiki-link-missing {
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+
+/* Shown in a CodeMirror hover tooltip. */
+.wiki-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 300px;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: white;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+  font-size: 12px;
+  line-height: 1.45;
+  color: #334155;
+  pointer-events: none;
+}
+
+.wiki-preview-kind {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.wiki-preview-title {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.wiki-preview-empty {
+  color: #94a3b8;
+  font-style: italic;
+}

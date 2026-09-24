@@ -1,0 +1,74 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "gray-on-color",
+        "value": "hover:bg-slate-100",
+        "createdAt": "2026-09-23T17:40:27.063Z"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "text-slate-600 on bg-blue-50",
+        "createdAt": "2026-09-23T18:07:58.174Z"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "text-slate-400 on bg-red-50",
+        "createdAt": "2026-09-23T18:07:58.215Z"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "text-slate-400 on bg-blue-600",
+        "createdAt": "2026-09-23T18:07:58.251Z"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/views/diagram/Inspector.tsx"
+        ],
+        "createdAt": "2026-09-23T18:07:58.287Z"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "text-slate-600 on bg-blue-600",
+        "createdAt": "2026-09-23T19:28:48.433Z"
+      },
+      {
+        "rule": "side-tab",
+        "value": "border-left: 3px solid #7c3aed",
+        "createdAt": "2026-09-23T20:52:47.248Z"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "text-slate-500 on hover:bg-red-50",
+        "createdAt": "2026-09-23T20:57:51.018Z"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "text-slate-700 on bg-blue-600",
+        "createdAt": "2026-09-23T23:40:53.744Z"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "text-slate-400 on hover:bg-red-50",
+        "createdAt": "2026-09-23T23:42:20.418Z"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/index.css"
+        ],
+        "createdAt": "2026-09-24T00:00:27.276Z"
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-09-24T00:00:27.333Z"
+      }
+    ]
+  }
+}

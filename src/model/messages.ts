@@ -1,0 +1,78 @@
+import { formatFrameRange, partyLabel } from "./frames";
+import { formatEndpoint } from "./services";
+import type { MessageEndpoint, Project, ProtoField, ProtoMessage } from "./types";
+
+export function endpointDevice(project: Project, end: MessageEndpoint | undefined) {
+  return end ? project.devices[end.deviceId] : undefined;
+}
+
+export function endpointService(project: Project, end: MessageEndpoint | undefined) {
+  if (!end?.serviceId) return undefined;
+  return project.devices[end.deviceId]?.services?.find((s) => s.id === end.serviceId);
+}
+
+export function endpointLabel(project: Project, end: MessageEndpoint | undefined): string | undefined {
+  return endpointDevice(project, end)?.name;
+}
+
+export function fieldTypeLabel(field: ProtoField) {
+  return field.repeated ? `repeated ${field.type}` : field.type;
+}
+
+export function messageMeta(message: ProtoMessage): string | undefined {
+  return [message.schemaFile, message.version].filter(Boolean).join(" \u00b7 ") || undefined;
+}
+
+// A transport to offer when the sender's service already names its port.
+export function suggestedTransport(project: Project, message: ProtoMessage): string | undefined {
+  const service = endpointService(project, message.sender);
+  const endpoint = formatEndpoint(service?.endpoint);
+  if (!endpoint) return undefined;
+  return [service?.endpoint?.protocol, endpoint].filter(Boolean).join(" ");
+}
+
+export function messageTouches(message: ProtoMessage, deviceId: string, direction: "all" | "sent" | "received" = "all") {
+  const sends = message.sender?.deviceId === deviceId;
+  const receives = message.receivers.some((r) => r.deviceId === deviceId);
+  if (direction === "sent") return sends;
+  if (direction === "received") return receives;
+  return sends || receives;
+}
+
+// One row of the combined communications list: a CAN frame definition or a Protobuf message.
+export interface CommunicationRow {
+  kind: "can" | "protobuf";
+  id: string;
+  name: string;
+  meta?: string;
+  from?: string;
+  to: string[];
+  transport?: string;
+}
+
+export function communicationRows(project: Project): CommunicationRow[] {
+  const frames: CommunicationRow[] = Object.values(project.frames).map((frame) => ({
+    kind: "can",
+    id: frame.id,
+    name: frame.name,
+    meta: formatFrameRange(frame),
+    from: frame.senderId ? partyLabel(project, frame.senderId) : undefined,
+    to: frame.receiverIds.map((id) => partyLabel(project, id)),
+    transport:
+      frame.busIds
+        .map((id) => project.buses[id])
+        .filter(Boolean)
+        .map((bus) => `CAN ${bus.tag ?? bus.name}`)
+        .join(", ") || undefined,
+  }));
+  const messages: CommunicationRow[] = Object.values(project.messages).map((message) => ({
+    kind: "protobuf",
+    id: message.id,
+    name: message.name,
+    meta: messageMeta(message),
+    from: endpointLabel(project, message.sender),
+    to: message.receivers.map((r) => endpointLabel(project, r)).filter((label): label is string => !!label),
+    transport: message.transport,
+  }));
+  return [...frames, ...messages];
+}
