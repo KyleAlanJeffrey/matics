@@ -384,19 +384,28 @@ function dropNetInterface(project: Project, interfaceId: string) {
 // those import as new records and the old ones are left as they were (`unpaired`).
 function pairImported<K extends string, R extends Record<K, string> & { variable?: string }, I extends Record<K, string> & { variable?: string }>(key: K, existing: R[], imported: I[]) {
   const keyOf = (binding: Record<K, string>): string => binding[key];
+  const byKey = new Map<string, R[]>();
+  for (const record of existing) {
+    const records = byKey.get(keyOf(record));
+    if (records) records.push(record);
+    else byKey.set(keyOf(record), [record]);
+  }
   const claimed = new Set<R>();
   const exact = imported.map((item) => {
-    const match = existing.find((r) => !claimed.has(r) && keyOf(r) === keyOf(item) && r.variable === item.variable);
+    const match = byKey.get(keyOf(item))?.find((r) => !claimed.has(r) && r.variable === item.variable);
     if (match) claimed.add(match);
     return match;
+  });
+  const unmatched = new Map<string, number>();
+  imported.forEach((item, i) => {
+    if (!exact[i]) unmatched.set(keyOf(item), (unmatched.get(keyOf(item)) ?? 0) + 1);
   });
   const ambiguous = new Set<R>();
   const matches = exact.map((match, i) => {
     if (match) return match;
     const value = keyOf(imported[i]);
-    const records = existing.filter((r) => !claimed.has(r) && keyOf(r) === value);
-    const items = imported.filter((item, j) => !exact[j] && keyOf(item) === value);
-    if (records.length === 1 && items.length === 1) return records[0];
+    const records = (byKey.get(value) ?? []).filter((r) => !claimed.has(r));
+    if (records.length === 1 && unmatched.get(value) === 1) return records[0];
     records.forEach((r) => ambiguous.add(r));
     return undefined;
   });
