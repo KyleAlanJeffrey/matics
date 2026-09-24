@@ -1,6 +1,7 @@
 import type { Project, ProjectMeta } from "@/model/types";
 import { desktop, isDesktop, type AppConfig, type ProjectEntry } from "@/lib/desktop";
 import { materializeAssets } from "@/lib/assets";
+import { assertCompleteProject } from "@/model/project-shape";
 import {
   deleteStoredProject,
   loadCurrentId,
@@ -119,6 +120,7 @@ class DesktopStorage implements ProjectStorage {
   async openFolder() {
     const dir = await desktop.pickFolder("Open a diagram project folder");
     if (!dir) return null;
+    assertCompleteProject(await desktop.readProject(dir), "That folder's project");
     const entry = await this.claim(await desktop.projectEntry(dir));
     // Only direct children of the root are listed on their own; remember everything else.
     const listed = (await desktop.listProjects(this.rootDir)).some((e) => e.dir === entry.dir);

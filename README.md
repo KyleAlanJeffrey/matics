@@ -62,6 +62,12 @@ The builds are not code signed yet, so the first launch needs one extra step:
   On first launch Matics asks for access to your Documents folder, where projects live.
 - **Windows:** in the SmartScreen prompt, choose **More info**, then **Run anyway**.
 
+After that, Matics keeps itself up to date: when a new build is out, an **Update** button
+appears in the header. Click it and choose **Restart and update**; your project is saved
+first. **Check for updates** in the File menu (on macOS, in the Matics menu) asks right
+away. Copies installed from the `.msi`, `.deb` or `.rpm` update by installing the new
+package.
+
 ## Quickstart
 
 1. **Open Matics.** The first launch opens the Demo Rover sample, a small fictional
@@ -92,6 +98,7 @@ Projects save automatically to `~/Documents/Matics/<project>/`.
 
 | Action | macOS | Windows and Linux |
 | --- | --- | --- |
+| New diagram | Cmd+N | Ctrl+N |
 | Diagram, Documentation, Communications, Sketches, Report | Cmd+1 to Cmd+5 | Ctrl+1 to Ctrl+5 |
 | Search documentation | Cmd+K | Ctrl+K |
 | Undo / redo | Cmd+Z / Cmd+Shift+Z | Ctrl+Z / Ctrl+Shift+Z |
@@ -148,7 +155,7 @@ src/store       project store with undo; disk storage in the app, IndexedDB in t
 src/views       one folder per page: diagram, notes, communications, frames, sketches, report
 src/components  app shell and shared UI
 src/lib         desktop commands, assets, menus, file saving
-src-tauri       the desktop shell: window, native menu, project folders, packages
+src-tauri       the desktop shell: window, macOS menu bar, project folders, packages, updates
 docs/           decisions, data model and development notes
 ```
 

@@ -4,9 +4,14 @@ Pre-1.0: the app reads only the formats described here.
 
 ## Platforms
 
-Desktop app built with Tauri 2: macOS is the developed and tested target; Windows and
-Linux builds are expected to work but are untested. The web view is the system one
-(WebKit on macOS), so anything that works only in Chromium is off limits.
+Desktop app built with Tauri 2: macOS is the main target and Windows is in use; Linux
+builds are expected to work but are untested. The web view is the system one (WebKit on
+macOS, WebView2 on Windows, WebKitGTK on Linux), so anything that works only in Chromium
+is off limits.
+
+In-app updates install the NSIS installer on Windows, the app bundle on macOS and the
+AppImage on Linux. Copies installed from the `.msi`, `.deb` or `.rpm` see new releases but
+update by installing the new package by hand.
 
 ## Project folder format
 
@@ -19,9 +24,11 @@ A project is a folder:
 ```
 
 `project.json` carries every required field of `Project`; fields marked optional in the
-type may be absent. `imageUrl` and `Document.file` reference assets by a path relative to
-the folder (`assets/...`). Bundled sample pictures use `/devices/...`. Inline data URL
-pictures (from JSON imports or the browser build) are written to `assets/` on first save.
+type may be absent. A project missing one of its collections (saved by an older build) is
+refused when a folder is opened, a diagram is imported or a package is unpacked, with a
+message naming what is missing. `imageUrl` and `Document.file` reference assets by a path
+relative to the folder (`assets/...`). Inline data URL pictures (from JSON imports or the
+browser build) are written to `assets/` on first save.
 Sketch scenes are stored in Excalidraw 0.18's element format.
 
 Folders are found under the projects root (`~/Documents/Matics`, unless `config.json` in

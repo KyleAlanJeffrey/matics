@@ -29,6 +29,7 @@ import {
   type Zone,
 } from "@/model/types";
 import { sampleProject } from "@/model/sample-project";
+import { assertCompleteProject } from "@/model/project-shape";
 import { resolveWikiTarget } from "@/model/derived";
 import { renameWikiLinks } from "@/model/markdown";
 import { busGeometry, DEFAULT_BUS_LENGTH } from "@/views/diagram/to-flow";
@@ -469,6 +470,7 @@ export const useProjectStore = create<ProjectState>()(
         const parsed = await readJsonFile<ProjectFile>(file);
         if (parsed.kind !== "diagram-maker-project" || !parsed.project)
           throw new Error("Not a diagram-maker project file");
+        assertCompleteProject(parsed.project, "That file");
         const project = { ...parsed.project, id: newId("project") };
         await adoptProject(project, set, get);
       },

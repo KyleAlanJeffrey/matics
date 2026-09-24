@@ -1,8 +1,14 @@
 name: Release
 
 # Every push to main (a merge or a direct push) builds the macOS, Windows and Linux
-# installers and publishes them as a GitHub release tagged v<VERSION>-build.<run number>.
-# Running it by hand on another branch builds the same installers as workflow artifacts only.
+# installers and publishes them as a GitHub release. The version is VERSION's major.minor
+# with the run number as the patch (0.1.12), so each build is newer than the last and the
+# in-app updater, which reads latest.json from the latest release, offers it. Running it by
+# hand on another branch builds the same installers as workflow artifacts only.
+#
+# Needs the TAURI_SIGNING_PRIVATE_KEY secret (and TAURI_SIGNING_PRIVATE_KEY_PASSWORD if the
+# key has one): updates are signed, and the app checks them against the public key in
+# src-tauri/tauri.conf.json.
 on:
   push:
     branches: [main]
@@ -26,6 +32,8 @@ jobs:
       contents: write
     outputs:
       id: ${{ steps.release.outputs.id }}
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,8 +42,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version="$(tr -d '[:space:]' < VERSION)"
-          tag="v${version}-build.${GITHUB_RUN_NUMBER}"
+          base="$(tr -d '[:space:]' < VERSION)"
+          version="${base%.*}.${GITHUB_RUN_NUMBER}"
+          tag="v${version}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
           # A re-run keeps its run number, so it reuses the release its first attempt made.
           id="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases" --jq ".[] | select(.tag_name == \"$tag\") | .id")"
           if [ -n "$id" ]; then
@@ -45,7 +56,7 @@ jobs:
           id="$(gh api "repos/$GITHUB_REPOSITORY/releases" \
             -f tag_name="$tag" \
             -f target_commitish="$GITHUB_SHA" \
-            -f name="Matics ${version} (build ${GITHUB_RUN_NUMBER})" \
+            -f name="Matics ${version}" \
             -f body="Built from ${GITHUB_SHA::7} on main. Download the installer for your platform below; the README has the first-launch steps." \
             -F draft=true \
             --jq .id)"
@@ -97,13 +108,31 @@ jobs:
           workspaces: src-tauri -> target
       - run: pnpm install --frozen-lockfile
 
-      # Without a release id this only builds.
+      - name: Stamp the build version
+        if: needs.create-release.outputs.version != ''
+        shell: bash
+        env:
+          VERSION: ${{ needs.create-release.outputs.version }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const file = "src-tauri/tauri.conf.json";
+            const config = JSON.parse(fs.readFileSync(file, "utf8"));
+            config.version = process.env.VERSION;
+            fs.writeFileSync(file, JSON.stringify(config, null, 2));
+          '
+
+      # Without a release id this only builds. latest.json is written by the publish job,
+      # once every platform is up; three jobs editing it in turn could drop an entry.
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           args: ${{ matrix.args }}
           releaseId: ${{ needs.create-release.outputs.id }}
+          includeUpdaterJson: false
 
       - uses: actions/upload-artifact@v4
         if: github.ref != 'refs/heads/main'
@@ -125,8 +154,43 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_ID: ${{ needs.create-release.outputs.id }}
+      TAG: ${{ needs.create-release.outputs.tag }}
+      VERSION: ${{ needs.create-release.outputs.version }}
     steps:
-      - env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_ID: ${{ needs.create-release.outputs.id }}
+      # The updater manifest: one update bundle and its signature per platform. The macOS
+      # build is universal, so both Mac architectures get it.
+      - name: Write latest.json
+        run: |
+          set -euo pipefail
+          assets="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets")"
+          entry() {
+            local name id
+            name="$(jq -r --arg suffix "$1" '[.[] | select(.name | endswith($suffix))][0].name // empty' <<<"$assets")"
+            id="$(jq -r --arg suffix "$1.sig" '[.[] | select(.name | endswith($suffix))][0].id // empty' <<<"$assets")"
+            if [ -z "$name" ] || [ -z "$id" ]; then
+              echo "No $1 update bundle with a signature on the release" >&2
+              exit 1
+            fi
+            jq -n \
+              --arg url "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$name" \
+              --arg signature "$(gh api -H "Accept: application/octet-stream" "repos/$GITHUB_REPOSITORY/releases/assets/$id")" \
+              '{signature: $signature, url: $url}'
+          }
+          mac="$(entry .app.tar.gz)"
+          windows="$(entry -setup.exe)"
+          linux="$(entry .AppImage)"
+          jq -n \
+            --arg version "$VERSION" \
+            --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --argjson mac "$mac" --argjson windows "$windows" --argjson linux "$linux" \
+            '{version: $version, pub_date: $date, platforms: {"darwin-aarch64": $mac, "darwin-x86_64": $mac, "windows-x86_64": $windows, "linux-x86_64": $linux}}' \
+            > latest.json
+          cat latest.json
+          gh release upload "$TAG" latest.json --clobber
+
+      - name: Publish the release
         run: gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" -F draft=false -f make_latest=true --silent

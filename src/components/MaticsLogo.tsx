@@ -19,11 +19,12 @@ export function MaticsMark({ inverse = false, className = "h-6 w-auto" }: { inve
   );
 }
 
-export function MaticsLogo({ inverse = false }: { inverse?: boolean }) {
+// `wordmarkClass` can hide the name on narrow windows, leaving the symbol.
+export function MaticsLogo({ inverse = false, wordmarkClass = "" }: { inverse?: boolean; wordmarkClass?: string }) {
   return (
-    <span className="flex items-center gap-2" aria-label="Matics">
+    <span className="flex shrink-0 items-center gap-2" aria-label="Matics">
       <MaticsMark inverse={inverse} className="h-6 w-auto" />
-      <span className={`text-[22px] font-extrabold leading-none tracking-tight ${inverse ? "text-white" : "text-charcoal"}`}>matics</span>
+      <span className={`text-[22px] font-extrabold leading-none tracking-tight ${inverse ? "text-white" : "text-charcoal"} ${wordmarkClass}`}>matics</span>
     </span>
   );
 }

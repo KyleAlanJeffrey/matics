@@ -1,4 +1,4 @@
-//! The native menu bar. Items that need the app (saving, exporting, switching pages) emit
+//! The macOS menu bar. Items that need the app (saving, exporting, switching pages) emit
 //! a "menu" event carrying the item id; src/lib/native-menu.ts handles them. Edit and window
 //! items are the platform's own, so text fields keep their standard shortcuts.
 //!
@@ -23,6 +23,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         &[
             &PredefinedMenuItem::about(app, Some("About Matics"), None)?,
+            &item(app, "app:check-updates", "Check for Updates...", None)?,
             &separator()?,
             &PredefinedMenuItem::services(app, None)?,
             &separator()?,
@@ -103,7 +104,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 
 pub fn forward<R: Runtime>(app: &AppHandle<R>, id: &str) {
     // Predefined items (copy, quit...) are handled by the OS and never get here with our ids.
-    if id.starts_with("file:") || id.starts_with("edit:") || id.starts_with("view:") {
+    if id.starts_with("app:") || id.starts_with("file:") || id.starts_with("edit:") || id.starts_with("view:") {
         let _ = app.emit(MENU_EVENT, id);
     }
 }
