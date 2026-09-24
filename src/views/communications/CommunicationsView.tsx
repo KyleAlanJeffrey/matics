@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router";
 import { Boxes, Database, FileCode2, Network, Plus, Search, Waypoints } from "lucide-react";
-import { useProject, useProjectStore } from "@/store/project-store";
+import { useProject } from "@/store/project-store";
 import { useSelection } from "@/lib/selection";
 import { communicationRows, type CommunicationRow } from "@/model/messages";
 import { FramesView } from "@/views/frames/FramesView";
@@ -41,16 +41,16 @@ export function CommunicationsView() {
   const [params, setParams] = useSearchParams();
   const tabParam = params.get("tab") as Tab | null;
   const tab: Tab = tabParam && TABS.includes(tabParam) ? tabParam : "all";
-  const { selectedId, select } = useSelection();
-  const { addMessage, addFrame, addNetMapping, addRoute } = useProjectStore();
-  const [addingService, setAddingService] = useState(false);
+  const { selectedId } = useSelection();
+  // The current tab's create form is open in place of its inspector.
+  const [adding, setAdding] = useState(false);
   const frameCount = Object.keys(project.frames).length;
   const messageCount = Object.keys(project.messages).length;
   const mappingCount = Object.keys(project.netMappings).length;
   const currentInterface = tab === "modbus" ? resolveInterface(project, params.get("interface"), selectedId) : undefined;
 
   const setTab = (next: Tab, selected?: string) => {
-    setAddingService(false);
+    setAdding(false);
     setParams(
       (prev) => {
         const out = new URLSearchParams(prev);
@@ -64,23 +64,8 @@ export function CommunicationsView() {
   };
 
   const add = () => {
-    if (tab === "can") {
-      select(addFrame({}));
-      return;
-    }
-    if (tab === "modbus") {
-      if (currentInterface) select(addNetMapping({ interfaceId: currentInterface.id, name: "New mapping", symbol: "", direction: "output" }));
-      return;
-    }
-    if (tab === "connections") {
-      select(addRoute({ name: "New connection", protocol: "" }));
-      return;
-    }
-    if (tab === "services") {
-      setAddingService(true);
-      return;
-    }
-    setTab("protobuf", addMessage());
+    if (tab === "all") setTab("protobuf");
+    setAdding(true);
   };
 
   return (
@@ -141,11 +126,11 @@ export function CommunicationsView() {
         </div>
       </div>
       <div className="min-h-0 flex-1">
-        {tab === "can" && <FramesView embedded />}
-        {tab === "protobuf" && <ProtobufView />}
-        {tab === "modbus" && <ModbusView />}
-        {tab === "connections" && <ConnectionsView />}
-        {tab === "services" && <ServicesView adding={addingService} onAdding={setAddingService} />}
+        {tab === "can" && <FramesView adding={adding} onAdding={setAdding} />}
+        {tab === "protobuf" && <ProtobufView adding={adding} onAdding={setAdding} />}
+        {tab === "modbus" && <ModbusView adding={adding} onAdding={setAdding} />}
+        {tab === "connections" && <ConnectionsView adding={adding} onAdding={setAdding} />}
+        {tab === "services" && <ServicesView adding={adding} onAdding={setAdding} />}
         {tab === "all" && <AllCommunications onOpen={(row) => setTab(row.kind, row.id)} />}
       </div>
     </div>

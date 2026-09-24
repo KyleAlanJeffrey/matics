@@ -60,6 +60,8 @@ export function IoView() {
   };
 
   const hasModules = Object.keys(project.ioModules).length > 0;
+  // The selection stays put while the form is open, so Cancel returns to it.
+  const shownId = mapping ? null : selectedId;
 
   return (
     <div className="flex h-full flex-col bg-white text-[13px]">
@@ -70,13 +72,7 @@ export function IoView() {
             <div className="mt-0.5 text-slate-500">Hardware channels and field-signal bindings</div>
           </div>
           <IoImportButton defaultDeviceId={scope?.deviceId} onImported={({ deviceId, moduleId }) => moduleId && setScope({ deviceId, moduleId })} />
-          <button
-            onClick={() => {
-              select(null);
-              setMapping(true);
-            }}
-            className="flex items-center gap-1.5 rounded-md bg-brand px-3.5 py-2 font-semibold text-charcoal hover:bg-brand-hover"
-          >
+          <button onClick={() => setMapping(true)} className="flex items-center gap-1.5 rounded-md bg-brand px-3.5 py-2 font-semibold text-charcoal hover:bg-brand-hover">
             <Plus className="h-4 w-4" /> Map signal
           </button>
         </div>
@@ -97,14 +93,14 @@ export function IoView() {
         {!hasModules ? (
           <EmptyIo onMap={() => setMapping(true)} />
         ) : tab === "review" ? (
-          <ReviewPanel project={project} selectedId={selectedId} onSelect={openSignal} />
+          <ReviewPanel project={project} selectedId={shownId} onSelect={openSignal} />
         ) : (
           <>
             <HardwareTree project={project} scope={scope} onScope={setScope} />
             {tab === "signals" ? (
-              <SignalsPanel project={project} scope={scope!} selectedId={selectedId} onSelect={openSignal} />
+              <SignalsPanel project={project} scope={scope!} selectedId={shownId} onSelect={openSignal} onMap={() => setMapping(true)} />
             ) : (
-              <ModulePanel project={project} scope={scope!} selectedId={selectedId} onSelect={openSignal} onScope={setScope} />
+              <ModulePanel project={project} scope={scope!} selectedId={shownId} onSelect={openSignal} onScope={setScope} />
             )}
           </>
         )}
@@ -205,7 +201,7 @@ const SIGNAL_COLUMNS = "grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_48px] @xl:grid-
 const REVIEW_COLUMNS = "grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_112px] @xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_120px]";
 const WIDE_ONLY = "hidden @xl:block";
 
-function SignalsPanel({ project, scope, selectedId, onSelect }: { project: Project; scope: Scope; selectedId: string | null; onSelect: (id: string) => void }) {
+function SignalsPanel({ project, scope, selectedId, onSelect, onMap }: { project: Project; scope: Scope; selectedId: string | null; onSelect: (id: string) => void; onMap: () => void }) {
   const [filter, setFilter] = useState<IoFilter>("all");
   const [query, setQuery] = useState("");
   const kinds = IO_FILTERS.find((f) => f.id === filter)!.kinds;
@@ -253,7 +249,28 @@ function SignalsPanel({ project, scope, selectedId, onSelect }: { project: Proje
           <span className={WIDE_ONLY}>Task</span>
           <span className={WIDE_ONLY}>Field device</span>
         </div>
-        {visible.length === 0 && <div className="px-4 py-8 text-center text-slate-400">{all.length === 0 ? "No signals on this module yet." : "Nothing matches."}</div>}
+        {visible.length === 0 && (
+          <div className="px-4 py-8 text-center text-slate-400">
+            {all.length === 0 ? (
+              <div className="flex flex-col items-center gap-2">
+                <span>No signals on this module yet.</span>
+                <button onClick={onMap} className="flex items-center gap-1.5 rounded-md px-2 py-1 text-brand-ink hover:bg-brand-wash">
+                  <Plus className="h-4 w-4" /> Map signal
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  setFilter("all");
+                  setQuery("");
+                }}
+                className="text-brand-ink hover:underline"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        )}
         {groups
           .filter((g) => g.rows.length > 0)
           .map((group) => (

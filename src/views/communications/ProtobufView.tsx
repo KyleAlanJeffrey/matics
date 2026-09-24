@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { ArrowDownToLine, ArrowUpFromLine, FileCode2, FileText, Plus, Trash2, Waypoints, X } from "lucide-react";
 import { useProject, useProjectStore } from "@/store/project-store";
 import { useSelection } from "@/lib/selection";
+import { CreatePane } from "@/components/CreatePane";
 import { DocumentLinks } from "@/components/DocumentLinks";
 import { NoteEditor } from "@/views/notes/NoteEditor";
 import { docHref } from "@/views/notes/NotesView";
@@ -17,10 +18,9 @@ const DOT = "\u00b7";
 type Direction = "all" | "sent" | "received";
 type Mode = "messages" | "by-device";
 
-export function ProtobufView() {
+export function ProtobufView({ adding, onAdding }: { adding: boolean; onAdding: (adding: boolean) => void }) {
   const project = useProject();
   const { selectedId, select } = useSelection();
-  const addMessage = useProjectStore((s) => s.addMessage);
   const [query, setQuery] = useState("");
   const [deviceFilter, setDeviceFilter] = useState("");
   const [direction, setDirection] = useState<Direction>("all");
@@ -43,6 +43,11 @@ export function ProtobufView() {
   const related = Array.from(
     new Set(visible.flatMap((m) => [m.sender, ...m.receivers].map((end) => endpointDevice(project, end)?.id).filter((id): id is string => !!id))),
   ).map((id) => project.devices[id]);
+
+  const choose = (id: string) => {
+    onAdding(false);
+    select(id);
+  };
 
   const showAll = () => {
     setDeviceFilter("");
@@ -118,8 +123,8 @@ export function ProtobufView() {
               to: message.receivers.map((r) => endpointLabel(project, r)).filter((label): label is string => !!label),
               toDetail: message.receivers.map((r) => endpointService(project, r)?.name).filter(Boolean).join(", ") || undefined,
               transport: message.transport,
-              selected: message.id === selectedId,
-              onClick: () => select(message.id),
+              selected: message.id === selectedId && !adding,
+              onClick: () => choose(message.id),
             }))}
             empty={
               messages.length === 0 ? (
@@ -127,7 +132,7 @@ export function ProtobufView() {
                   <span>No Protobuf messages yet. Import your .proto files, or add a message by hand.</span>
                   <span className="flex gap-2">
                     <ProtoImportButton subtle />
-                    <button onClick={() => select(addMessage())} className="flex items-center gap-1.5 rounded-md px-2 py-1 text-brand-ink hover:bg-brand-wash">
+                    <button onClick={() => onAdding(true)} className="flex items-center gap-1.5 rounded-md px-2 py-1 text-brand-ink hover:bg-brand-wash">
                       <Plus className="h-4 w-4" /> Add message
                     </button>
                   </span>
@@ -152,8 +157,8 @@ export function ProtobufView() {
                   : "Nothing matches."
             }
             direction={direction}
-            selectedId={selectedId}
-            onSelect={select}
+            selectedId={adding ? null : selectedId}
+            onSelect={choose}
           />
         )}
 
@@ -171,8 +176,12 @@ export function ProtobufView() {
           </div>
         )}
       </div>
-      {/* Keyed so an edit in progress never carries over to another message. */}
-      {selected && <MessageInspector key={selected.id} message={selected} onClose={() => select(null)} />}
+      {adding ? (
+        <AddMessageForm onCancel={() => onAdding(false)} onSaved={choose} />
+      ) : (
+        // Keyed so an edit in progress never carries over to another message.
+        selected && <MessageInspector key={selected.id} message={selected} onClose={() => select(null)} />
+      )}
     </div>
   );
 }
@@ -312,7 +321,7 @@ function MessageInspector({ message, onClose }: { message: ProtoMessage; onClose
             </div>
           </Field>
           <Field label="Fields" group>
-            <FieldsTable message={message} />
+            <FieldsTable fields={message.fields} onChange={(fields) => updateMessage(message.id, { fields })} />
           </Field>
         </section>
 
@@ -416,6 +425,70 @@ function MessageInspector({ message, onClose }: { message: ProtoMessage; onClose
   );
 }
 
+function AddMessageForm({ onCancel, onSaved }: { onCancel: () => void; onSaved: (messageId: string) => void }) {
+  const project = useProject();
+  const addMessage = useProjectStore((s) => s.addMessage);
+  const [name, setName] = useState("");
+  const [schemaFile, setSchemaFile] = useState("");
+  const [version, setVersion] = useState("");
+  const [fields, setFields] = useState<ProtoField[]>([]);
+  const [sender, setSender] = useState<MessageEndpoint | undefined>();
+  const [receiver, setReceiver] = useState<MessageEndpoint | undefined>();
+  const [routeId, setRouteId] = useState("");
+  const routes = Object.values(project.routes).sort((a, b) => a.name.localeCompare(b.name));
+
+  const save = () =>
+    onSaved(
+      addMessage({
+        name: name.trim(),
+        schemaFile: schemaFile.trim() || undefined,
+        version: version.trim() || undefined,
+        fields,
+        sender,
+        receivers: receiver ? [receiver] : [],
+        routeId: routeId || undefined,
+      }),
+    );
+
+  return (
+    <CreatePane title="Add Protobuf message" submitLabel="Create message" ready={!!name.trim()} onCancel={onCancel} onSubmit={save}>
+      <Field label="Name">
+        <input className="input" autoFocus placeholder="e.g. PoseEstimate" value={name} onChange={(e) => setName(e.target.value)} />
+      </Field>
+      <Field label="Schema source" group>
+        <div className="flex gap-2">
+          <input className="input font-mono" aria-label="Schema file" placeholder="Optional, e.g. drive_control.proto" value={schemaFile} onChange={(e) => setSchemaFile(e.target.value)} />
+          <input className="input w-20 font-mono" aria-label="Schema version" placeholder="v1" value={version} onChange={(e) => setVersion(e.target.value)} />
+        </div>
+      </Field>
+      <Field label="Fields" group>
+        <FieldsTable fields={fields} onChange={setFields} />
+      </Field>
+      <Field label="Sender" icon={<ArrowUpFromLine className="h-3.5 w-3.5 text-brand-ink" />} group>
+        <div className="grid grid-cols-[1fr_1fr_20px] gap-1.5">
+          <EndpointPicker project={project} name="Sender" value={sender} optional onChange={setSender} />
+        </div>
+      </Field>
+      <Field label="Receiver" icon={<ArrowDownToLine className="h-3.5 w-3.5 text-teal-600" />} group>
+        <div className="grid grid-cols-[1fr_1fr_20px] gap-1.5">
+          <EndpointPicker project={project} name="Receiver" value={receiver} optional onChange={setReceiver} />
+        </div>
+        <span className="text-[11px] text-slate-400">Add more receivers once the message exists.</span>
+      </Field>
+      <Field label="Connection">
+        <select className="input" value={routeId} onChange={(e) => setRouteId(e.target.value)}>
+          <option value="">Not linked</option>
+          {routes.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name || "Untitled connection"}
+            </option>
+          ))}
+        </select>
+      </Field>
+    </CreatePane>
+  );
+}
+
 // A label around a group of controls would click the first of them (a remove button) when
 // its text is clicked, so groups get a plain heading instead.
 function Field({ label, icon, group = false, children }: { label: string; icon?: React.ReactNode; group?: boolean; children: React.ReactNode }) {
@@ -447,10 +520,8 @@ function parseFieldType(text: string): Pick<ProtoField, "type" | "repeated"> {
   return text.startsWith(REPEATED) ? { type: text.slice(REPEATED.length), repeated: true } : { type: text, repeated: undefined };
 }
 
-function FieldsTable({ message }: { message: ProtoMessage }) {
-  const updateMessage = useProjectStore((s) => s.updateMessage);
-  const setField = (index: number, patch: Partial<ProtoField>) =>
-    updateMessage(message.id, { fields: message.fields.map((field, i) => (i === index ? { ...field, ...patch } : field)) });
+function FieldsTable({ fields, onChange }: { fields: ProtoField[]; onChange: (fields: ProtoField[]) => void }) {
+  const setField = (index: number, patch: Partial<ProtoField>) => onChange(fields.map((field, i) => (i === index ? { ...field, ...patch } : field)));
   const cell = "input !border-transparent !bg-transparent !px-1 font-mono hover:!border-slate-200 focus:!border-[var(--color-accent)]";
 
   return (
@@ -461,19 +532,20 @@ function FieldsTable({ message }: { message: ProtoMessage }) {
         <span>Type</span>
         <span />
       </div>
-      {message.fields.length === 0 && <div className="px-3 py-2 text-slate-400">No fields.</div>}
-      {message.fields.map((field, index) => (
+      {fields.length === 0 && <div className="px-3 py-2 text-slate-400">No fields.</div>}
+      {fields.map((field, index) => (
         <div key={index} className="grid grid-cols-[48px_1fr_1fr_24px] items-center gap-1 border-t border-slate-100 px-3 py-1 font-mono text-[12px]">
           <input className={`${cell} text-slate-500`} aria-label={`Field ${index + 1} tag`} inputMode="numeric" value={field.tag} onChange={(e) => setField(index, { tag: Number(e.target.value.replace(/\D/g, "")) || 0 })} />
           <input className={`${cell} text-slate-900`} aria-label={`Field ${index + 1} name`} value={field.name} onChange={(e) => setField(index, { name: e.target.value })} />
           <input className={`${cell} text-slate-700`} aria-label={`Field ${index + 1} type`} value={fieldTypeLabel(field)} onChange={(e) => setField(index, parseFieldType(e.target.value))} />
-          <button onClick={() => updateMessage(message.id, { fields: message.fields.filter((_, i) => i !== index) })} className="text-slate-400 hover:text-red-700" title="Remove field">
+          <button type="button" onClick={() => onChange(fields.filter((_, i) => i !== index))} className="text-slate-400 hover:text-red-700" title="Remove field">
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
       ))}
       <button
-        onClick={() => updateMessage(message.id, { fields: [...message.fields, { tag: Math.max(0, ...message.fields.map((f) => f.tag)) + 1, name: "field", type: "string" }] })}
+        type="button"
+        onClick={() => onChange([...fields, { tag: Math.max(0, ...fields.map((f) => f.tag)) + 1, name: "field", type: "string" }])}
         className="flex w-full items-center gap-1 border-t border-slate-100 px-3 py-1.5 text-brand-ink hover:bg-slate-50"
       >
         <Plus className="h-3.5 w-3.5" /> Field

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { ArrowRight, BookOpen, Pencil, Search, Waypoints, X } from "lucide-react";
+import { ArrowRight, BookOpen, Pencil, Plus, Search, Waypoints, X } from "lucide-react";
 import { useProject, useProjectStore } from "@/store/project-store";
 import { useSelection } from "@/lib/selection";
 import { DocumentLinks } from "@/components/DocumentLinks";
@@ -68,7 +68,12 @@ export function ServicesView({ adding, onAdding }: { adding: boolean; onAdding: 
                   Clear filters
                 </button>
               ) : (
-                "No services yet. Add one for each piece of software a device runs."
+                <div className="flex flex-col items-center gap-2">
+                  <span>No services yet. Add one for each piece of software a device runs.</span>
+                  <button onClick={() => onAdding(true)} className="flex items-center gap-1.5 rounded-md px-2 py-1 text-brand-ink hover:bg-brand-wash">
+                    <Plus className="h-4 w-4" /> Add service
+                  </button>
+                </div>
               )}
             </div>
           )}
