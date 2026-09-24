@@ -347,7 +347,9 @@ export const useProjectStore = create<ProjectState>()(
           if (!project) {
             project = structuredClone(sampleProject);
             await storage.save(project);
-            index = [withDir(meta(project))];
+            const sample = withDir(meta(project));
+            // Keep the skipped projects; the browser build would otherwise lose them from its index.
+            index = [...index.filter((m) => m.id !== sample.id), sample];
             await storage.updateIndex(index);
           }
           await storage.setCurrent(project.id);
