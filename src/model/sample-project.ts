@@ -272,13 +272,20 @@ const sampleMessages: Record<string, ProtoMessage> = {
     sender: { deviceId: "modem", serviceId: "telemetry-uplink" },
     receivers: [{ deviceId: "computer", serviceId: "drive-planner" }],
     transport: "MQTT :8883",
-    routeId: "route-telemetry",
+    routeId: "route-goal-downlink",
   },
 };
 
 // One of each state: a built link, a planned proxy and a feed still missing its far end.
 const sampleRoutes: Record<string, Route> = {
   "route-telemetry": { id: "route-telemetry", name: "Telemetry uplink", from: { deviceId: "computer" }, to: { deviceId: "modem", serviceId: "telemetry-uplink" }, protocol: "MQTT" },
+  "route-goal-downlink": {
+    id: "route-goal-downlink",
+    name: "Goal downlink",
+    from: { deviceId: "modem", serviceId: "telemetry-uplink" },
+    to: { deviceId: "computer", serviceId: "drive-planner" },
+    protocol: "MQTT",
+  },
   "route-power-ui": {
     id: "route-power-ui",
     name: "Power UI proxy",

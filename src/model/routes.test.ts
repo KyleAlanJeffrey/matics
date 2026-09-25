@@ -18,7 +18,9 @@ describe("routes", () => {
   });
 
   it("finds what a route carries and which routes touch a service", () => {
-    expect(routeMessages(sampleProject, "route-telemetry").map((m) => m.name)).toEqual(["DriveGoal", "PoseEstimate"]);
+    expect(routeMessages(sampleProject, "route-telemetry").map((m) => m.name)).toEqual(["PoseEstimate"]);
+    expect(routeMessages(sampleProject, "route-goal-downlink").map((m) => m.name)).toEqual(["DriveGoal"]);
+    expect(serviceRoutes(sampleProject, "telemetry-uplink").map((r) => r.id)).toEqual(["route-telemetry", "route-goal-downlink"]);
     expect(serviceRoutes(sampleProject, "power-web-ui").map((r) => r.id)).toEqual(["route-power-ui"]);
     expect(routeDevices(sampleProject)).toEqual(["modem", "computer", "power"]);
   });
