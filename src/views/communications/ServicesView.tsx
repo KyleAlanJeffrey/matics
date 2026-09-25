@@ -88,8 +88,11 @@ export function ServicesView({ adding, onAdding }: { adding: boolean; onAdding: 
         <AddService
           defaultDeviceId={deviceId}
           onCancel={() => onAdding(false)}
-          onSaved={(id) => {
+          onSaved={(id, savedDeviceId) => {
             onAdding(false);
+            // Filters that would hide the new service make way for it.
+            if (deviceId && deviceId !== savedDeviceId) setDeviceId(savedDeviceId);
+            setQuery("");
             select(id);
           }}
         />
@@ -235,7 +238,7 @@ function ServiceInspector({ serviceRef, onClose }: { serviceRef: ServiceRef; onC
   );
 }
 
-function AddService({ defaultDeviceId, onCancel, onSaved }: { defaultDeviceId: string; onCancel: () => void; onSaved: (serviceId: string) => void }) {
+function AddService({ defaultDeviceId, onCancel, onSaved }: { defaultDeviceId: string; onCancel: () => void; onSaved: (serviceId: string, deviceId: string) => void }) {
   const project = useProject();
   const addService = useProjectStore((s) => s.addService);
   const devices = Object.values(project.devices);
@@ -249,16 +252,22 @@ function AddService({ defaultDeviceId, onCancel, onSaved }: { defaultDeviceId: s
         </button>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
-        <Field label="Runs on">
-          <select className="input" value={deviceId} onChange={(e) => setDeviceId(e.target.value)}>
-            {devices.map((device) => (
-              <option key={device.id} value={device.id}>
-                {device.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <ServiceForm onCancel={onCancel} onSave={(draft) => deviceId && onSaved(addService(deviceId, draft))} />
+        {devices.length === 0 ? (
+          <p className="text-slate-600">A service runs on a device. Add a device to the schematic first.</p>
+        ) : (
+          <>
+            <Field label="Runs on">
+              <select className="input" value={deviceId} onChange={(e) => setDeviceId(e.target.value)}>
+                {devices.map((device) => (
+                  <option key={device.id} value={device.id}>
+                    {device.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <ServiceForm onCancel={onCancel} onSave={(draft) => onSaved(addService(deviceId, draft), deviceId)} />
+          </>
+        )}
       </div>
     </aside>
   );
