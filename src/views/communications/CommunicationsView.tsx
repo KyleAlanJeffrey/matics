@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router";
-import { Boxes, Database, FileCode2, Network, Plus, Search, Waypoints } from "lucide-react";
+import { Boxes, Braces, Database, FileCode2, Network, Plus, Search, Waypoints } from "lucide-react";
 import { useProject } from "@/store/project-store";
 import { useSelection } from "@/lib/selection";
 import { communicationRows, type CommunicationRow } from "@/model/messages";
@@ -8,12 +8,13 @@ import { FramesView } from "@/views/frames/FramesView";
 import { IoImportButton } from "@/views/io/IoImportButton";
 import { ProtobufView } from "./ProtobufView";
 import { ModbusView, resolveInterface } from "./ModbusView";
+import { ApiView } from "./ApiView";
 import { ConnectionsView } from "./ConnectionsView";
 import { ServicesView } from "./ServicesView";
 import { MessageTable } from "./MessageTable";
 import { ProtoImportButton } from "./ProtoImportButton";
 
-const TABS = ["all", "can", "protobuf", "modbus", "connections", "services"] as const;
+const TABS = ["all", "can", "protobuf", "modbus", "api", "connections", "services"] as const;
 type Tab = (typeof TABS)[number];
 type Kind = CommunicationRow["kind"];
 
@@ -22,20 +23,22 @@ const ADD_LABELS: Record<Tab, string> = {
   can: "Add frame",
   protobuf: "Add message",
   modbus: "Add mapping",
+  api: "Add API",
   connections: "Add connection",
   services: "Add service",
 };
 
-const KIND_LABELS: Record<Kind, string> = { can: "CAN", protobuf: "Protobuf", modbus: "Modbus" };
+const KIND_LABELS: Record<Kind, string> = { can: "CAN", protobuf: "Protobuf", modbus: "Modbus", api: "API" };
 
 function KindIcon({ kind }: { kind: Kind }) {
   if (kind === "can") return <Network className="h-4 w-4 shrink-0 text-[#713bc4]" />;
   if (kind === "protobuf") return <FileCode2 className="h-4 w-4 shrink-0 text-brand-ink" />;
+  if (kind === "api") return <Braces className="h-4 w-4 shrink-0 text-sky-600" />;
   return <Database className="h-4 w-4 shrink-0 text-emerald-600" />;
 }
 
 // Messages exchanged between devices and services. CAN frame definitions, Protobuf
-// messages and fieldbus mappings each keep their own fields; "All" lists them together.
+// messages, fieldbus mappings and APIs each keep their own fields; "All" lists them together.
 export function CommunicationsView() {
   const project = useProject();
   const [params, setParams] = useSearchParams();
@@ -93,7 +96,7 @@ export function CommunicationsView() {
               }
             />
           ) : (
-            tab !== "connections" && tab !== "services" && <ProtoImportButton onImported={() => setTab("protobuf")} />
+            tab !== "api" && tab !== "connections" && tab !== "services" && <ProtoImportButton onImported={() => setTab("protobuf")} />
           )}
           <button
             onClick={add}
@@ -117,6 +120,9 @@ export function CommunicationsView() {
           <TabButton active={tab === "modbus"} onClick={() => setTab("modbus")} icon={<Database className="h-4 w-4 text-emerald-600" />}>
             Modbus {"\u00b7"} {mappingCount}
           </TabButton>
+          <TabButton active={tab === "api"} onClick={() => setTab("api")} icon={<Braces className="h-4 w-4 text-sky-600" />}>
+            API {"\u00b7"} {Object.keys(project.apis).length}
+          </TabButton>
           <TabButton active={tab === "connections"} onClick={() => setTab("connections")} icon={<Waypoints className="h-4 w-4 text-slate-500" />}>
             Connections {"\u00b7"} {Object.keys(project.routes).length}
           </TabButton>
@@ -129,6 +135,7 @@ export function CommunicationsView() {
         {tab === "can" && <FramesView adding={adding} onAdding={setAdding} />}
         {tab === "protobuf" && <ProtobufView adding={adding} onAdding={setAdding} />}
         {tab === "modbus" && <ModbusView adding={adding} onAdding={setAdding} />}
+        {tab === "api" && <ApiView adding={adding} onAdding={setAdding} />}
         {tab === "connections" && <ConnectionsView adding={adding} onAdding={setAdding} />}
         {tab === "services" && <ServicesView adding={adding} onAdding={setAdding} />}
         {tab === "all" && <AllCommunications onOpen={(row) => setTab(row.kind, row.id)} />}
@@ -208,6 +215,8 @@ function AllCommunications({ onOpen }: { onOpen: (row: CommunicationRow) => void
           meta: row.meta,
           badge: KIND_LABELS[row.kind],
           from: row.from,
+          // An API's callers come from its connections, not from a field on the API.
+          fromMissing: row.kind === "api" ? "No caller linked" : undefined,
           to: row.to,
           transport: row.transport,
           onClick: () => onOpen(row),
@@ -225,7 +234,7 @@ function AllCommunications({ onOpen }: { onOpen: (row: CommunicationRow) => void
               Clear filters
             </button>
           ) : (
-            "No CAN frames, Protobuf messages or network mappings yet."
+            "No CAN frames, Protobuf messages, network mappings or APIs yet."
           )
         }
       />

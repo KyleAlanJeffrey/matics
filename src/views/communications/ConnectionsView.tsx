@@ -129,7 +129,7 @@ export function ConnectionsView({ adding, onAdding }: { adding: boolean; onAddin
   );
 }
 
-function DeviceFilterButton({ label, count, active, onClick }: { label: string; count: number; active: boolean; onClick: () => void }) {
+export function DeviceFilterButton({ label, count, active, onClick }: { label: string; count: number; active: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick} className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-left ${active ? "bg-brand-wash font-semibold text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -318,7 +318,7 @@ function AddConnectionForm({ defaultDeviceId, onCancel, onSaved }: { defaultDevi
   );
 }
 
-function EndField({ project, label, value, onChange }: { project: Project; label: string; value: MessageEndpoint | undefined; onChange: (end: MessageEndpoint | undefined) => void }) {
+export function EndField({ project, label, value, onChange }: { project: Project; label: string; value: MessageEndpoint | undefined; onChange: (end: MessageEndpoint | undefined) => void }) {
   const endpoint = formatEndpoint(endpointService(project, value)?.endpoint);
   const service = endpointService(project, value);
   return (
@@ -335,7 +335,7 @@ function EndField({ project, label, value, onChange }: { project: Project; label
   );
 }
 
-function ServiceLink({ project, label, end }: { project: Project; label: string; end: MessageEndpoint | undefined }) {
+export function ServiceLink({ project, label, end }: { project: Project; label: string; end: MessageEndpoint | undefined }) {
   const service = endpointService(project, end);
   if (!service) return null;
   return (

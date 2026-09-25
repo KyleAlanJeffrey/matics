@@ -118,6 +118,39 @@ describe("routes", () => {
   });
 });
 
+describe("APIs", () => {
+  beforeEach(() => {
+    useProjectStore.setState({ project: structuredClone(sampleProject) });
+  });
+
+  it("unlinks a removed message from the endpoints that carried it", () => {
+    useProjectStore.getState().removeMessage("msg-pose-estimate");
+    const [getPose, setGoal] = useProjectStore.getState().project.apis["api-navigation"].endpoints;
+    expect(getPose).toEqual({ method: "rpc", path: "GetPose", description: "Latest pose estimate" });
+    expect(setGoal.requestId).toBe("msg-drive-goal");
+  });
+
+  it("drops a removed service from the server and a removed device's whole server", () => {
+    const store = useProjectStore.getState();
+    store.removeService("power", "power-web-ui");
+    expect(useProjectStore.getState().project.apis["api-power"].server).toEqual({ deviceId: "power" });
+    store.removeDevice("power");
+    expect(useProjectStore.getState().project.apis["api-power"].server).toBeUndefined();
+    expect(useProjectStore.getState().project.apis["api-power"].endpoints).toHaveLength(3);
+  });
+
+  it("takes its notes and document links with it", () => {
+    const store = useProjectStore.getState();
+    const id = store.addApi({ name: "Machine API", style: "REST", endpoints: [] });
+    store.linkDocument("driver-manual", id);
+    expect(useProjectStore.getState().project.docLinks.some((l) => l.entityId === id)).toBe(true);
+    store.removeApi(id);
+    const project = useProjectStore.getState().project;
+    expect(project.apis[id]).toBeUndefined();
+    expect(project.docLinks.some((l) => l.entityId === id)).toBe(false);
+  });
+});
+
 describe("I/O", () => {
   beforeEach(() => {
     useProjectStore.setState({ project: structuredClone(sampleProject) });

@@ -156,7 +156,7 @@ the stack decision in `00-tech-stack.md`.
 
 ## Communications
 
-- All, CAN, Protobuf, Modbus, Connections and Services tabs. All lists every definition with a type and a
+- All, CAN, Protobuf, Modbus, API, Connections and Services tabs. All lists every definition with a type and a
   device filter; a CAN party that is a product counts as each of its copies. Opening a row
   goes to its own tab with it selected.
 - CAN frames (`Project.frames`, `src/model/frames.ts`) are
@@ -180,6 +180,11 @@ the stack decision in `00-tech-stack.md`.
   filter and a derived status. The inspector edits both ends with the same device and
   service pickers as a Protobuf message, links messages to the route, and links to the
   services at either end. A Protobuf message's inspector picks its connection.
+- API (`src/model/apis.ts`) lists API definitions with a device filter (the device
+  serving each) and a style filter. The inspector edits the definition, its endpoints
+  (method, path, description, request and response message) and shows the connections to
+  or from the serving service. In All, an API reads from its callers, taken from those
+  connections, to its server. A service's inspector lists the APIs it answers.
 - Services lists every `DeviceService` across devices. It is a second view of the same
   records the device inspector and documentation pages edit, and it uses the same
   `ServiceForm`, so port validation is shared. A service stays on its device; moving one

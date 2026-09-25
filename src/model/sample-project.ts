@@ -1,4 +1,4 @@
-import type { CanFrame, Project, DevicePreset, DeviceInstance, DeviceService, Connection, IoDirection, IoKind, IoModule, IoSignal, NetInterface, NetMapping, ProtoMessage, Route, ServiceEndpoint, WireBundle } from "./types";
+import type { ApiDefinition, CanFrame, Project, DevicePreset, DeviceInstance, DeviceService, Connection, IoDirection, IoKind, IoModule, IoSignal, NetInterface, NetMapping, ProtoMessage, Route, ServiceEndpoint, WireBundle } from "./types";
 import { sampleNotes } from "./sample-notes";
 
 // A fictional demo rover: a core of shared electronics and three identical drive modules.
@@ -298,6 +298,35 @@ const sampleRoutes: Record<string, Route> = {
   "route-can-feed": { id: "route-can-feed", name: "CAN bridge feed", from: { deviceId: "modem", serviceId: "can-bridge" }, protocol: "UDP" },
 };
 
+const sampleApis: Record<string, ApiDefinition> = {
+  "api-power": {
+    id: "api-power",
+    name: "Power controller API",
+    style: "REST",
+    version: "v1",
+    basePath: "/api/v1",
+    specFile: "power-api.yaml",
+    server: { deviceId: "power", serviceId: "power-web-ui" },
+    endpoints: [
+      { method: "GET", path: "/outputs", description: "Every output and whether it is on" },
+      { method: "PUT", path: "/outputs/{id}", description: "Switch one output on or off" },
+      { method: "GET", path: "/status", description: "Supply voltages and latched faults" },
+    ],
+  },
+  "api-navigation": {
+    id: "api-navigation",
+    name: "Navigation",
+    style: "gRPC",
+    version: "v1",
+    specFile: "rover.proto",
+    server: { deviceId: "computer", serviceId: "navigation" },
+    endpoints: [
+      { method: "rpc", path: "GetPose", description: "Latest pose estimate", responseId: "msg-pose-estimate" },
+      { method: "rpc", path: "SetGoal", description: "Replace the current drive goal", requestId: "msg-drive-goal" },
+    ],
+  },
+};
+
 // The power controller's I/O. A few mappings are left incomplete so Mapping review has work.
 const sampleIoModules: Record<string, IoModule> = {
   "io-local": { id: "io-local", deviceId: "power", name: "IO-1", description: "Local I/O" },
@@ -380,6 +409,7 @@ export const sampleProject: Project = {
   netInterfaces: sampleNetInterfaces,
   netMappings: sampleNetMappings,
   routes: sampleRoutes,
+  apis: sampleApis,
   documents: {
     "driver-manual": { id: "driver-manual", title: "MD-200 manual", kind: "pdf", scope: "preset", presetId: "driver", url: "https://example.com/docs/md-200-manual.pdf" },
     "encoder-wiring": { id: "encoder-wiring", title: "Encoder wiring notes", kind: "note", scope: "preset", presetId: "driver" },

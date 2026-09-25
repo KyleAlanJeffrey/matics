@@ -22,6 +22,7 @@ const RECORD_FIELDS = [
   "netInterfaces",
   "netMappings",
   "routes",
+  "apis",
 ] as const;
 
 function isRecord(value: unknown) {

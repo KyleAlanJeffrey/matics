@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { ArrowRight, BookOpen, Pencil, Plus, Search, Waypoints, X } from "lucide-react";
+import { ArrowRight, BookOpen, Braces, Pencil, Plus, Search, Waypoints, X } from "lucide-react";
 import { useProject, useProjectStore } from "@/store/project-store";
 import { useSelection } from "@/lib/selection";
 import { DocumentLinks } from "@/components/DocumentLinks";
@@ -11,6 +11,7 @@ import { CountBadge, Field } from "@/views/frames/FramesView";
 import { noteKeyFor } from "@/model/derived";
 import { findService, type ServiceRef } from "@/model/services";
 import { allServices, serviceRoutes } from "@/model/routes";
+import { serviceApis } from "@/model/apis";
 import type { Project } from "@/model/types";
 
 const SERVICE_COLUMNS = "grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] @2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_110px]";
@@ -149,6 +150,7 @@ function ServiceInspector({ serviceRef, onClose }: { serviceRef: ServiceRef; onC
   const [editing, setEditing] = useState(false);
   const { device, service } = serviceRef;
   const routes = serviceRoutes(project, service.id);
+  const apis = serviceApis(project, service.id);
   const sends = Object.values(project.messages).filter((m) => m.sender?.serviceId === service.id);
   const receives = Object.values(project.messages).filter((m) => m.receivers.some((r) => r.serviceId === service.id));
 
@@ -204,6 +206,17 @@ function ServiceInspector({ serviceRef, onClose }: { serviceRef: ServiceRef; onC
             </button>
           </section>
         )}
+
+        <section className="flex flex-col gap-2 border-t border-slate-200 pt-4">
+          <h3 className="text-[15px] font-semibold text-slate-900">APIs</h3>
+          {apis.length === 0 && <div className="text-slate-400">No API is defined for this service.</div>}
+          {apis.map((api) => (
+            <Link key={api.id} to={`/communications?tab=api&selected=${api.id}`} className="flex items-center gap-2 text-brand-ink hover:underline">
+              <Braces className="h-3.5 w-3.5 shrink-0" /> {api.name || "Untitled API"}
+              {api.style && <span className="text-[12px] text-slate-500">{api.style}</span>}
+            </Link>
+          ))}
+        </section>
 
         <section className="flex flex-col gap-2 border-t border-slate-200 pt-4">
           <h3 className="text-[15px] font-semibold text-slate-900">Related connections</h3>

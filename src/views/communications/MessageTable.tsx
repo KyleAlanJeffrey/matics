@@ -5,6 +5,8 @@ export interface MessageTableRow {
   meta?: string;
   badge?: string;
   from?: string;
+  // Shown when from is unset.
+  fromMissing?: string;
   fromDetail?: string;
   to: string[];
   toDetail?: string;
@@ -42,7 +44,7 @@ export function MessageTable({ rows, empty }: { rows: MessageTableRow[]; empty: 
           </span>
           <span className="min-w-0">
             <span className="block truncate text-slate-800">
-              {row.from ?? <span className="text-slate-400">Sender not set</span>} {"\u2192"} {row.to.length ? row.to.join(", ") : <span className="text-slate-400">Receiver not set</span>}
+              {row.from ?? <span className="text-slate-400">{row.fromMissing ?? "Sender not set"}</span>} {"\u2192"} {row.to.length ? row.to.join(", ") : <span className="text-slate-400">Receiver not set</span>}
             </span>
             {(row.fromDetail || row.toDetail) && <span className="block truncate text-[11.5px] text-slate-500">{[row.fromDetail, row.toDetail].filter(Boolean).join(" \u2192 ")}</span>}
           </span>
