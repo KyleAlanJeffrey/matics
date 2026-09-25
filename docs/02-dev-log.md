@@ -187,7 +187,8 @@ the stack decision in `00-tech-stack.md`.
 - Every tab's Add opens a short create form where the inspector sits
   (`components/CreatePane.tsx`), like "Map signal" on I/O. Nothing is written until the
   form is submitted, so Cancel returns to whatever was selected, and the new record is
-  selected after. A connection created with a message links it in the same undo step,
+  selected after. Filters that would hide the new record are cleared (on Modbus, the
+  table's filters always reset), so it is always in the list. A connection created with a message links it in the same undo step,
   because edits inside the undo coalescing window merge. An empty table offers the same
   create action; a filtered one that shows nothing offers Clear filters.
 

@@ -37,17 +37,27 @@ export function ConnectionsView({ adding, onAdding }: { adding: boolean; onAddin
   const all = Object.values(project.routes).sort((a, b) => a.name.localeCompare(b.name));
   const protocols = [...new Set(all.map((r) => r.protocol.trim()).filter(Boolean))].sort();
   const needle = query.trim().toLowerCase();
-  const rows = all.filter(
-    (route) =>
-      (!deviceId || routeTouches(route, deviceId)) &&
-      (!protocol || route.protocol.trim() === protocol) &&
-      (!needle || [route.name, route.protocol, route.path, endLabel(project, route.from), endLabel(project, route.to)].some((text) => text?.toLowerCase().includes(needle))),
-  );
+  const shows = (route: Route) =>
+    (!deviceId || routeTouches(route, deviceId)) &&
+    (!protocol || route.protocol.trim() === protocol) &&
+    (!needle || [route.name, route.protocol, route.path, endLabel(project, route.from), endLabel(project, route.to)].some((text) => text?.toLowerCase().includes(needle)));
+  const rows = all.filter(shows);
   const selected = selectedId ? project.routes[selectedId] : undefined;
   const filtered = !!deviceId || !!protocol || !!needle;
   const choose = (id: string) => {
     onAdding(false);
     select(id);
+  };
+  const clearFilters = () => {
+    setDeviceId("");
+    setProtocol("");
+    setQuery("");
+  };
+  // Filters that would hide a new connection make way for it.
+  const created = (id: string) => {
+    const route = useProjectStore.getState().project.routes[id];
+    if (route && !shows(route)) clearFilters();
+    choose(id);
   };
 
   return (
@@ -90,14 +100,7 @@ export function ConnectionsView({ adding, onAdding }: { adding: boolean; onAddin
           {rows.length === 0 && (
             <div className="px-4 py-8 text-center text-slate-400">
               {filtered ? (
-                <button
-                  onClick={() => {
-                    setDeviceId("");
-                    setProtocol("");
-                    setQuery("");
-                  }}
-                  className="text-brand-ink hover:underline"
-                >
+                <button onClick={clearFilters} className="text-brand-ink hover:underline">
                   Clear filters
                 </button>
               ) : (
@@ -118,7 +121,7 @@ export function ConnectionsView({ adding, onAdding }: { adding: boolean; onAddin
       </div>
 
       {adding ? (
-        <AddConnectionForm defaultDeviceId={deviceId} onCancel={() => onAdding(false)} onSaved={choose} />
+        <AddConnectionForm defaultDeviceId={deviceId} onCancel={() => onAdding(false)} onSaved={created} />
       ) : (
         selected && <RouteInspector key={selected.id} route={selected} onClose={() => select(null)} />
       )}

@@ -30,6 +30,9 @@ export function ModbusView({ adding, onAdding }: { adding: boolean; onAdding: (a
   const [addingInterface, setAddingInterface] = useState(false);
   const current = resolveInterface(project, params.get("interface"), selectedId);
   const selected = selectedId ? project.netMappings[selectedId] : undefined;
+  // Bumped by each new mapping. It remounts the table, which clears its filters, so the
+  // new mapping is listed.
+  const [created, setCreated] = useState(0);
   const choose = (id: string) => {
     onAdding(false);
     select(id);
@@ -59,7 +62,7 @@ export function ModbusView({ adding, onAdding }: { adding: boolean; onAdding: (a
         }}
       />
       {current ? (
-        <InterfacePanel key={current.id} project={project} netInterface={current} selectedId={adding ? null : selectedId} onSelect={choose} onAdd={() => onAdding(true)} />
+        <InterfacePanel key={`${current.id}:${created}`} project={project} netInterface={current} selectedId={adding ? null : selectedId} onSelect={choose} onAdd={() => onAdding(true)} />
       ) : (
         <div className="flex flex-1 items-center justify-center bg-slate-50/60 p-6">
           <div className="max-w-md rounded-lg border border-dashed border-slate-300 bg-white px-6 py-8 text-center text-slate-600">
@@ -72,7 +75,14 @@ export function ModbusView({ adding, onAdding }: { adding: boolean; onAdding: (a
         </div>
       )}
       {adding ? (
-        <AddMappingForm defaultInterfaceId={current?.id} onCancel={() => onAdding(false)} onSaved={choose} />
+        <AddMappingForm
+          defaultInterfaceId={current?.id}
+          onCancel={() => onAdding(false)}
+          onSaved={(id) => {
+            setCreated((n) => n + 1);
+            choose(id);
+          }}
+        />
       ) : (
         // Closing keeps the mapping's interface in view: it may not be the one in the URL.
         selected && <MappingInspector key={selected.id} mapping={selected} onClose={() => pick(selected.interfaceId)} />

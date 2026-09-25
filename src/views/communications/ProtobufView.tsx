@@ -30,13 +30,14 @@ export function ProtobufView({ adding, onAdding }: { adding: boolean; onAdding: 
   const byDevice = useMemo(() => messagesByDevice(project), [project]);
   const selected = selectedId ? project.messages[selectedId] : undefined;
   const needle = query.trim().toLowerCase();
-  const visible = messages.filter((message) => {
+  const shows = (message: ProtoMessage) => {
     if (deviceFilter && !messageTouches(message, deviceFilter, direction)) return false;
     if (!needle) return true;
     const services = [message.sender, ...message.receivers].map((end) => endpointService(project, end)?.name);
     const devices = [message.sender, ...message.receivers].map((end) => endpointLabel(project, end));
     return [message.name, message.schemaFile, message.transport, ...services, ...devices, ...message.fields.map((f) => f.name)].some((text) => text?.toLowerCase().includes(needle));
-  });
+  };
+  const visible = messages.filter(shows);
   const visibleIds = new Set(visible.map((m) => m.id));
 
   // Devices on either end of the listed messages, for their documentation.
@@ -52,6 +53,17 @@ export function ProtobufView({ adding, onAdding }: { adding: boolean; onAdding: 
   const showAll = () => {
     setDeviceFilter("");
     setDirection("all");
+  };
+  // Filters that would hide a new message make way for it. By device lists only messages
+  // with an end, so one without goes back to the message list.
+  const created = (id: string) => {
+    const message = useProjectStore.getState().project.messages[id];
+    if (message && !shows(message)) {
+      showAll();
+      setQuery("");
+    }
+    if (message && mode === "by-device" && !message.sender && message.receivers.length === 0) setMode("messages");
+    choose(id);
   };
 
   return (
@@ -177,7 +189,7 @@ export function ProtobufView({ adding, onAdding }: { adding: boolean; onAdding: 
         )}
       </div>
       {adding ? (
-        <AddMessageForm onCancel={() => onAdding(false)} onSaved={choose} />
+        <AddMessageForm onCancel={() => onAdding(false)} onSaved={created} />
       ) : (
         // Keyed so an edit in progress never carries over to another message.
         selected && <MessageInspector key={selected.id} message={selected} onClose={() => select(null)} />

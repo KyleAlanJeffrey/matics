@@ -32,18 +32,17 @@ export function FramesView({ adding, onAdding }: { adding: boolean; onAdding: (a
   const unassigned = frames.filter((f) => knownBuses(f).length === 0).length;
   const selectedFrame = selectedId ? project.frames[selectedId] : undefined;
 
-  const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    const needleId = parseCanId(query);
-    return frames.filter((frame) => {
-      if (partyFilter && frame.senderId !== partyFilter && !frame.receiverIds.includes(partyFilter)) return false;
-      if (busFilter === UNASSIGNED ? knownBuses(frame).length > 0 : busFilter && !frame.busIds.includes(busFilter)) return false;
-      if (!needle) return true;
-      if (frame.name.toLowerCase().includes(needle)) return true;
-      if (needleId !== undefined && needleId >= frame.startId && needleId <= frame.endId) return true;
-      return formatFrameRange(frame).toLowerCase().includes(needle);
-    });
-  }, [frames, query, partyFilter, busFilter, project.buses]);
+  const needle = query.trim().toLowerCase();
+  const needleId = parseCanId(query);
+  const shows = (frame: CanFrame) => {
+    if (partyFilter && frame.senderId !== partyFilter && !frame.receiverIds.includes(partyFilter)) return false;
+    if (busFilter === UNASSIGNED ? knownBuses(frame).length > 0 : busFilter && !frame.busIds.includes(busFilter)) return false;
+    if (!needle) return true;
+    if (frame.name.toLowerCase().includes(needle)) return true;
+    if (needleId !== undefined && needleId >= frame.startId && needleId <= frame.endId) return true;
+    return formatFrameRange(frame).toLowerCase().includes(needle);
+  };
+  const visible = frames.filter(shows);
 
   const choose = (id: string) => {
     onAdding(false);
@@ -53,6 +52,12 @@ export function FramesView({ adding, onAdding }: { adding: boolean; onAdding: (a
     setQuery("");
     setPartyFilter("");
     setBusFilter("");
+  };
+  // Filters that would hide a new frame make way for it.
+  const created = (id: string) => {
+    const frame = useProjectStore.getState().project.frames[id];
+    if (frame && !shows(frame)) clearFilters();
+    choose(id);
   };
 
   return (
@@ -202,7 +207,7 @@ export function FramesView({ adding, onAdding }: { adding: boolean; onAdding: (a
           defaultBusId={busFilter}
           defaultGroup={frames[frames.length - 1]?.group}
           onCancel={() => onAdding(false)}
-          onSaved={choose}
+          onSaved={created}
         />
       ) : (
         selectedFrame && <FrameEditor frame={selectedFrame} onClose={() => select(null)} />
