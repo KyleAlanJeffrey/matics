@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router";
-import { Maximize2, Minimize2, Plus, Search } from "lucide-react";
+import { FileUp, Maximize2, Minimize2, Plus, Search } from "lucide-react";
 import { useProject, useProjectStore } from "@/store/project-store";
+import { isDesktop } from "@/lib/desktop";
+import { useAttachFile } from "@/components/DocumentLinks";
 import { instancesOf, noteKeyFor } from "@/model/derived";
 import { ALL_DOCUMENTS, OVERVIEW_ID, UNFILED, documentOwners, isOwner, ownerKeyFor, searchDocumentation } from "@/model/documentation";
 import { isService } from "@/model/services";
@@ -48,6 +50,7 @@ export function NotesView() {
     <div className="flex h-full flex-col bg-white">
       <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-3">
         <DocumentationSearch />
+        {isDesktop() && <AttachFileButton owner={owner} />}
         <NewDocumentButton owner={owner} />
       </div>
       <div className="flex min-h-0 flex-1">
@@ -75,6 +78,27 @@ function resolveTarget(project: Project, id: string): { owner: string; doc?: str
   const key = noteKeyFor(project, id);
   if (isOwner(project, key)) return { owner: key };
   return null;
+}
+
+// On a device or network page the file is linked there; anywhere else it is unfiled.
+function AttachFileButton({ owner }: { owner: string }) {
+  const project = useProject();
+  const { attach, attaching } = useAttachFile();
+  const navigate = useNavigate();
+  return (
+    <button
+      disabled={attaching}
+      onClick={async () => {
+        const linkTo = isOwner(project, owner) ? owner : null;
+        const id = await attach(linkTo);
+        if (id) navigate(docHref(project, linkTo ?? UNFILED, id));
+      }}
+      className="flex shrink-0 items-center gap-1.5 rounded-md border border-slate-300 px-4 py-2 font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50"
+      title="Copy a PDF or other file into the project folder"
+    >
+      <FileUp className="h-4 w-4" /> Attach PDF or file
+    </button>
+  );
 }
 
 function NewDocumentButton({ owner }: { owner: string }) {
