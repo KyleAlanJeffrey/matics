@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
-import { ArrowDownToLine, ArrowUpFromLine, FileCode2, FileText, Plus, Trash2, X } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, FileCode2, FileText, Plus, Trash2, Waypoints, X } from "lucide-react";
 import { useProject, useProjectStore } from "@/store/project-store";
 import { useSelection } from "@/lib/selection";
 import { DocumentLinks } from "@/components/DocumentLinks";
@@ -273,6 +273,8 @@ function MessageInspector({ message, onClose }: { message: ProtoMessage; onClose
   const { updateMessage, removeMessage } = useProjectStore();
   const scroller = useRef<HTMLDivElement>(null);
   const suggestion = suggestedTransport(project, message);
+  const route = message.routeId ? project.routes[message.routeId] : undefined;
+  const routes = Object.values(project.routes).sort((a, b) => a.name.localeCompare(b.name));
 
   const jump = (id: string) => {
     const target = scroller.current?.querySelector<HTMLElement>(`[data-section="${id}"]`);
@@ -372,6 +374,22 @@ function MessageInspector({ message, onClose }: { message: ProtoMessage; onClose
               Use {suggestion}
             </button>
           )}
+          <Field label="Connection">
+            <select className="input" value={message.routeId ?? ""} onChange={(e) => updateMessage(message.id, { routeId: e.target.value || undefined })}>
+              <option value="">Not linked</option>
+              {message.routeId && !route && <option value={message.routeId}>Missing connection</option>}
+              {routes.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name || "Untitled connection"}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {route && (
+            <Link to={`/communications?tab=connections&selected=${route.id}`} className="-mt-1 flex items-center gap-1 self-start text-brand-ink hover:underline">
+              <Waypoints className="h-3.5 w-3.5" /> View connection
+            </Link>
+          )}
           <div className="text-[12px] text-slate-500">The message format and its transport are set separately.</div>
         </section>
 
@@ -466,7 +484,7 @@ function FieldsTable({ message }: { message: ProtoMessage }) {
 
 // A device, then optionally one of its services, as two selects. An optional end (the
 // sender) can be unset; a receiver is removed with its own button instead.
-function EndpointPicker({
+export function EndpointPicker({
   project,
   name,
   value,

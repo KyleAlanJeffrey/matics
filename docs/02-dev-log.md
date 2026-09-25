@@ -156,7 +156,7 @@ the stack decision in `00-tech-stack.md`.
 
 ## Communications
 
-- All, CAN, Protobuf and Modbus tabs. All lists every definition with a type and a
+- All, CAN, Protobuf, Modbus, Connections and Services tabs. All lists every definition with a type and a
   device filter; a CAN party that is a product counts as each of its copies. Opening a row
   goes to its own tab with it selected.
 - CAN frames (`Project.frames`, `src/model/frames.ts`) are
@@ -176,6 +176,14 @@ the stack decision in `00-tech-stack.md`.
   inspector shows them read-only beside its own binding and register. A selected mapping
   (`?selected=`) decides the interface in view, so rows opened from All land on the right
   one. "Add mapping" adds a blank mapping to the interface in view and selects it.
+- Connections (`src/model/routes.ts`) lists routes with a device filter, a protocol
+  filter and a derived status. The inspector edits both ends with the same device and
+  service pickers as a Protobuf message, links messages to the route, and links to the
+  services at either end. A Protobuf message's inspector picks its connection.
+- Services lists every `DeviceService` across devices. It is a second view of the same
+  records the device inspector and documentation pages edit, and it uses the same
+  `ServiceForm`, so port validation is shared. A service stays on its device; moving one
+  between devices is not supported.
 
 ## Sketches
 

@@ -22,7 +22,7 @@ Project
   ioSignals:    Record<id, IoSignal>        channel bindings on a module
   netInterfaces: Record<id, NetInterface>   fieldbus interfaces such as Modbus
   netMappings:  Record<id, NetMapping>      PLC variables mapped on an interface
-  routes:       Record<id, Route>           end-to-end connections (no UI yet)
+  routes:       Record<id, Route>           connections: who talks to whom, and how
 ```
 
 ## Ports
@@ -123,7 +123,7 @@ typed in: `name` (nested messages as `Outer.Inner`), the `schemaFile` it came fr
 `MessageEndpoint` of `deviceId` plus an optional `serviceId`, and a free-text `transport`.
 `src/model/proto.ts` parses proto2/proto3 message blocks, including oneof and map fields,
 and skips enums, services and options. Re-importing a file updates messages matched by
-name, schema file and package and keeps their routing. Removing a device or service clears it from
+name, schema file and package and keeps their routing and `routeId`. Removing a device or service clears it from
 message endpoints. A message's documents and note are keyed by its id.
 
 ## I/O
@@ -173,8 +173,17 @@ channel. New mappings are named after their symbol (`pump_speed`
 reads "Pump speed"). Removing an interface removes its mappings and their notes
 and document links.
 
-`Route` is stored but not edited yet; the Communications page will use it for end-to-end
-connections. Removing a device or service clears it from route ends.
+## Connections
+
+A `Route` (in `Project.routes`, shown as a connection) says who talks to whom and how,
+apart from what the data looks like: a `name`, optional `from` and `to` ends (each a
+`MessageEndpoint`, a device plus an optional service), a free-text `protocol` (`MQTT`,
+`HTTP`), an optional `path` (URL path or topic) and `proposed` for a route that is planned
+but not built. A `ProtoMessage` names the route it travels on with `routeId`; a route
+never lists its messages itself. Status is derived (`routeStatus`): proposed, else
+defined when both ends and a protocol are set, else incomplete. Removing a route unlinks
+its messages and deletes its note and document links; removing a device or service
+clears it from route ends. A route's note and documents are keyed by its id.
 
 ## Sketches
 

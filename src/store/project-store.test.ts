@@ -96,6 +96,28 @@ describe("messages and sketches", () => {
   });
 });
 
+describe("routes", () => {
+  beforeEach(() => {
+    useProjectStore.setState({ project: structuredClone(sampleProject) });
+  });
+
+  it("unlinks messages from a removed route and keeps the messages", () => {
+    useProjectStore.getState().removeRoute("route-telemetry");
+    const project = useProjectStore.getState().project;
+    expect(project.routes["route-telemetry"]).toBeUndefined();
+    expect(project.messages["msg-pose-estimate"].routeId).toBeUndefined();
+    expect(project.messages["msg-pose-estimate"].sender).toEqual({ deviceId: "computer", serviceId: "navigation" });
+  });
+
+  it("drops a removed service from route ends and a removed device's whole end", () => {
+    const store = useProjectStore.getState();
+    store.removeService("power", "power-web-ui");
+    expect(useProjectStore.getState().project.routes["route-power-ui"].to).toEqual({ deviceId: "power" });
+    store.removeDevice("power");
+    expect(useProjectStore.getState().project.routes["route-power-ui"].to).toBeUndefined();
+  });
+});
+
 describe("I/O", () => {
   beforeEach(() => {
     useProjectStore.setState({ project: structuredClone(sampleProject) });

@@ -294,6 +294,8 @@ export interface ProtoMessage {
   receivers: MessageEndpoint[];
   // How it travels, in words ("ZMQ PUB :5555", "WebSocket"). Unset until known.
   transport?: string;
+  // The connection (Route) it travels on, when one is defined.
+  routeId?: string;
 }
 
 // Physical I/O: named signals bound to the hardware channels of a controller's modules.
