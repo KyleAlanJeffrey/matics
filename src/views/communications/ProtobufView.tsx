@@ -54,15 +54,21 @@ export function ProtobufView({ adding, onAdding }: { adding: boolean; onAdding: 
     setDeviceFilter("");
     setDirection("all");
   };
-  // Filters that would hide a new message make way for it. By device lists only messages
-  // with an end, so one without goes back to the message list.
+  // Filters that would hide a new message make way for it. By device lists a message only
+  // under the ends the direction shows, so one with no end goes back to the message list
+  // and one missing the shown end brings back both directions.
   const created = (id: string) => {
     const message = useProjectStore.getState().project.messages[id];
     if (message && !shows(message)) {
       showAll();
       setQuery("");
     }
-    if (message && mode === "by-device" && !message.sender && message.receivers.length === 0) setMode("messages");
+    if (message && mode === "by-device") {
+      const hasSender = !!message.sender;
+      const hasReceiver = message.receivers.length > 0;
+      if (!hasSender && !hasReceiver) setMode("messages");
+      else if ((direction === "sent" && !hasSender) || (direction === "received" && !hasReceiver)) setDirection("all");
+    }
     choose(id);
   };
 
