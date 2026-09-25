@@ -1,4 +1,4 @@
-import type { CanFrame, Project, DevicePreset, DeviceInstance, DeviceService, Connection, IoDirection, IoKind, IoModule, IoSignal, ProtoMessage, ServiceEndpoint, WireBundle } from "./types";
+import type { CanFrame, Project, DevicePreset, DeviceInstance, DeviceService, Connection, IoDirection, IoKind, IoModule, IoSignal, NetInterface, NetMapping, ProtoMessage, ServiceEndpoint, WireBundle } from "./types";
 import { sampleNotes } from "./sample-notes";
 
 // A fictional demo rover: a core of shared electronics and three identical drive modules.
@@ -280,6 +280,18 @@ const sampleIoModules: Record<string, IoModule> = {
   "io-analog": { id: "io-analog", deviceId: "power", name: "AI-4", description: "Analog expansion" },
 };
 
+// The charging dock talks to the power controller over a serial Modbus link. The unit ID
+// and one register are left unrecorded on purpose.
+const sampleNetInterfaces: Record<string, NetInterface> = {
+  "netif-dock": { id: "netif-dock", deviceId: "power", module: "PC-12", name: "IF1", protocol: "Modbus", peerDeviceId: "dock", transport: "RTU over RS-485" },
+};
+
+const sampleNetMappings: Record<string, NetMapping> = {
+  "netmap-charge-voltage": { id: "netmap-charge-voltage", interfaceId: "netif-dock", name: "Charge voltage", symbol: "charge_voltage", direction: "input", variable: "gDock.Inputs.ChargeVoltage", task: "Cyclic#5", register: "30001" },
+  "netmap-charge-current": { id: "netmap-charge-current", interfaceId: "netif-dock", name: "Charge current", symbol: "charge_current", direction: "input", variable: "gDock.Inputs.ChargeCurrent", task: "Cyclic#5", register: "30002" },
+  "netmap-charge-enable": { id: "netmap-charge-enable", interfaceId: "netif-dock", name: "Charge enable", symbol: "charge_enable", direction: "output", variable: "gDock.Outputs.ChargeEnable", task: "Cyclic#1" },
+};
+
 type SignalRow = [string, string, string, IoKind, IoDirection, string, Partial<IoSignal>?];
 const signalRows: SignalRow[] = [
   ["io-local", "BatteryVoltage", "AnalogInput01", "ai", "input", "Cyclic#5"],
@@ -341,8 +353,8 @@ export const sampleProject: Project = {
   sketches: {},
   ioModules: sampleIoModules,
   ioSignals: sampleIoSignals,
-  netInterfaces: {},
-  netMappings: {},
+  netInterfaces: sampleNetInterfaces,
+  netMappings: sampleNetMappings,
   routes: {},
   documents: {
     "driver-manual": { id: "driver-manual", title: "MD-200 manual", kind: "pdf", scope: "preset", presetId: "driver", url: "https://example.com/docs/md-200-manual.pdf" },

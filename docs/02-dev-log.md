@@ -148,13 +148,18 @@ the stack decision in `00-tech-stack.md`.
   instead, guessing type and direction from the channel name until they are set.
 - Import reads an `IoMap.iom` in the page and asks which controller it belongs to,
   preferring a device named after a module in the file. A channel's settings (PWM period,
-  current feedback) are attached to the output channel with the same number.
+  current feedback) are attached to the output channel with the same number. Interface
+  mappings in the same file go to Communications > Modbus in the same undo step; the
+  Modbus tab has the same Import.
 - The review lists physical channels missing a field device, pin or (for analog
   channels) range. Missing documentation is not reported as a wrong mapping.
 
 ## Communications
 
-- All, CAN and Protobuf tabs. CAN frames (`Project.frames`, `src/model/frames.ts`) are
+- All, CAN, Protobuf and Modbus tabs. All lists every definition with a type and a
+  device filter; a CAN party that is a product counts as each of its copies. Opening a row
+  goes to its own tab with it selected.
+- CAN frames (`Project.frames`, `src/model/frames.ts`) are
   identifier allocations with sender, receivers, buses and a group. A frame lists `busIds`
   because a gateway can forward the same identifiers onto several networks.
 - DBC import (`parseDbc`) reads nodes, `BO_` messages, receivers, extra transmitters and
@@ -166,6 +171,11 @@ the stack decision in `00-tech-stack.md`.
   type box takes `repeated <type>` as in the schema. As on the CAN tab, the sidebar
   lists devices with their sent and received counts (`messagesByDevice`) and filters
   on click, and "By device" shows each device's messages split into sends and receives.
+- Modbus lists interfaces by controller (`?interface=`). The interface's name, protocol,
+  peer, transport and unit ID are edited in a card above its mappings; a mapping's
+  inspector shows them read-only beside its own binding and register. A selected mapping
+  (`?selected=`) decides the interface in view, so rows opened from All land on the right
+  one. "Add mapping" adds a blank mapping to the interface in view and selects it.
 
 ## Sketches
 

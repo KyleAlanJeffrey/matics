@@ -20,8 +20,8 @@ Project
   sketches:     Record<id, Sketch>          Excalidraw scenes
   ioModules:    Record<id, IoModule>        I/O modules on a controller
   ioSignals:    Record<id, IoSignal>        channel bindings on a module
-  netInterfaces: Record<id, NetInterface>   fieldbus interfaces such as Modbus (no UI yet)
-  netMappings:  Record<id, NetMapping>      symbols mapped on an interface (no UI yet)
+  netInterfaces: Record<id, NetInterface>   fieldbus interfaces such as Modbus
+  netMappings:  Record<id, NetMapping>      PLC variables mapped on an interface
   routes:       Record<id, Route>           end-to-end connections (no UI yet)
 ```
 
@@ -141,15 +141,40 @@ and `range`. Kind `other` marks module-level bindings (module status, serial num
 which have no field side.
 
 `src/model/io.ts` reads B&R `IoMap.iom` files (`parseIoMap`, `ioMapModules`). Lines whose
-channel has a dot (`"CPU".IF2.symbol`) are fieldbus interface mappings; the I/O import
-counts and skips them. Re-importing matches modules by device and name and signals by
-channel, updates the binding and keeps the field side, notes and documents. A signal's
-note and documents are keyed by its id. Removing a module removes its signals; removing a
-device removes its modules and interfaces and clears it as a field device or peer.
+channel has a dot (`"CPU".IF2.symbol`) are fieldbus interface mappings (see Network
+interfaces below); `ioMapInterfaces` groups them. Re-importing matches modules by device
+and name and signals by channel, updates the binding and keeps the field side, notes and
+documents. A channel bound to several variables (an input read into two) is one signal per
+variable. On re-import a signal pairs with its own variable first; what is left pairs only
+one to one, so a single renamed variable still updates its signal. When two or more
+variables on one channel all changed, which became which is a guess: they import as new
+signals, the old ones are left as they were, and the import says how many to check. A
+signal's note and documents are keyed by its id. Removing a module removes its signals;
+removing a device removes its modules and interfaces and clears it as a field device or
+peer.
 
-`NetInterface`, `NetMapping` and `Route` are stored but not edited yet; the Communications
-page will use them for Modbus and end-to-end connections. Removing a device or service
-clears it from route ends.
+## Network interfaces
+
+A `NetInterface` (in `Project.netInterfaces`) is a controller's fieldbus interface:
+`deviceId`, the hardware `module` it is on (as the controller names it), `name` (`IF2`), a
+free-text `protocol` (imports set `Modbus`), and the optional `peerDeviceId`, `transport`
+and `unitId`. A `NetMapping` (in `Project.netMappings`) is one PLC variable exchanged over
+it under a symbolic name: `interfaceId`, `name`, `symbol`, `direction` (from the
+controller's side), and the optional `variable`, `task` and `register`. A symbolic mapping
+does not imply a register address; `register` stays empty until someone records it.
+Mappings keep the order they were added in, which for an import is the file's order.
+
+Importing an `IoMap.iom` matches interfaces by device, module and name and mappings by
+symbol; a match gets the new variable, direction and task and keeps its name, register,
+notes and documents. An interface added by hand has no module, so the import takes it over
+when it is the only such interface on the device with that name and the file has just one
+interface of that name. A symbol bound to several variables pairs the same way as a
+channel. New mappings are named after their symbol (`pump_speed`
+reads "Pump speed"). Removing an interface removes its mappings and their notes
+and document links.
+
+`Route` is stored but not edited yet; the Communications page will use it for end-to-end
+connections. Removing a device or service clears it from route ends.
 
 ## Sketches
 

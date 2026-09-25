@@ -23,10 +23,10 @@ describe("parseIoMap", () => {
     expect(file.bindings[5]).toEqual({ task: undefined, variable: "Mux:Mux.A1.Output_BOOL", direction: "output", module: "DO-8", channel: "DigitalOutput03" });
   });
 
-  it("counts interface mappings apart and reports lines it cannot read", () => {
+  it("keeps interface mappings apart and reports lines it cannot read", () => {
     const file = parseIoMap(`${IO_MAP}\nVAR_CONFIG\n\tnot a binding\nEND_VAR`);
     expect(file.bindings).toHaveLength(8);
-    expect(file.interfaceBindings).toBe(1);
+    expect(file.interfaceBindings).toEqual([{ task: "Cyclic#1", variable: "gNet.Outputs.Heartbeat", direction: "output", module: "CPU", interface: "IF2", symbol: "heartbeat" }]);
     expect(file.skipped).toEqual(["not a binding"]);
   });
 });

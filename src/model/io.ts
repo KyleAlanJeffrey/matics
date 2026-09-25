@@ -124,10 +124,19 @@ export interface IoMapBinding {
   channel: string;
 }
 
+// A mapping onto a module's interface, such as `"CPU".IF2.symbol`: network data, not a channel.
+export interface IoMapInterfaceBinding {
+  task?: string;
+  variable: string;
+  direction: IoDirection;
+  module: string;
+  interface: string;
+  symbol: string;
+}
+
 export interface IoMapFile {
   bindings: IoMapBinding[];
-  // Mappings onto a module's interface, such as `"CPU".IF2.symbol`; they are network data.
-  interfaceBindings: number;
+  interfaceBindings: IoMapInterfaceBinding[];
   skipped: string[];
 }
 
@@ -135,7 +144,7 @@ const BINDING = /^(?:([A-Za-z]+#\d+)\.)?(\S+)\s+AT\s+%([IQ])[A-Z]\."([^"]+)"\.([
 
 // Reads the VAR_CONFIG blocks of a B&R Automation Studio I/O mapping (IoMap.iom).
 export function parseIoMap(text: string): IoMapFile {
-  const result: IoMapFile = { bindings: [], interfaceBindings: 0, skipped: [] };
+  const result: IoMapFile = { bindings: [], interfaceBindings: [], skipped: [] };
   const lines = text.replace(/\(\*[\s\S]*?\*\)/g, "").split(/\r?\n/);
   for (const raw of lines) {
     const line = raw.trim();
@@ -145,12 +154,15 @@ export function parseIoMap(text: string): IoMapFile {
       result.skipped.push(line);
       continue;
     }
-    const [, task, variable, io, module, channel] = match;
-    if (channel.includes(".")) {
-      result.interfaceBindings++;
+    const [, task, rawVariable, io, module, channel] = match;
+    const variable = rawVariable.replace(/^::/, "");
+    const direction = io === "I" ? "input" : "output";
+    const dot = channel.indexOf(".");
+    if (dot > 0) {
+      result.interfaceBindings.push({ task, variable, direction, module, interface: channel.slice(0, dot), symbol: channel.slice(dot + 1) });
       continue;
     }
-    result.bindings.push({ task, variable: variable.replace(/^::/, ""), direction: io === "I" ? "input" : "output", module, channel });
+    result.bindings.push({ task, variable, direction, module, channel });
   }
   return result;
 }
