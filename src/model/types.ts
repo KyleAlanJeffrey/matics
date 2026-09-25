@@ -381,6 +381,35 @@ export interface Route {
   proposed?: boolean;
 }
 
+// A request/response interface a service answers, such as a REST API or a gRPC service.
+// The endpoint list is kept here; the full specification stays in its own file.
+export interface ApiDefinition {
+  id: string;
+  name: string;
+  // REST, gRPC, WebSocket and so on, in words.
+  style: string;
+  version?: string;
+  // Prefix of every endpoint path, e.g. "/api/v1".
+  basePath?: string;
+  // The OpenAPI document, .proto file or similar that holds the full definition.
+  specFile?: string;
+  description?: string;
+  // The service that answers it.
+  server?: MessageEndpoint;
+  endpoints: ApiEndpoint[];
+}
+
+export interface ApiEndpoint {
+  // An HTTP method, or "rpc" and the like for other styles.
+  method: string;
+  // A URL path under the base path, or an RPC name.
+  path: string;
+  description?: string;
+  // Protobuf message definitions carried as the request and the response.
+  requestId?: string;
+  responseId?: string;
+}
+
 // A freeform Excalidraw drawing. Elements and files are Excalidraw's own JSON, kept as-is.
 export interface Sketch {
   id: string;
@@ -416,6 +445,7 @@ export interface Project {
   netInterfaces: Record<string, NetInterface>;
   netMappings: Record<string, NetMapping>;
   routes: Record<string, Route>;
+  apis: Record<string, ApiDefinition>;
 }
 
 export type EntityKind = "device" | "preset" | "bus" | "zone" | "document";

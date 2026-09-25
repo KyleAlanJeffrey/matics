@@ -25,6 +25,7 @@ import {
   type Position,
   type ProtoMessage,
   type Route,
+  type ApiDefinition,
   type Sketch,
   type Project,
   type WireBundle,
@@ -107,6 +108,7 @@ function emptyProject(name: string, library: Library): Project {
     netInterfaces: {},
     netMappings: {},
     routes: {},
+    apis: {},
   };
 }
 
@@ -231,6 +233,9 @@ interface ProjectState {
   updateRoute: (routeId: string, patch: Partial<Omit<Route, "id">>) => void;
   // Messages that travelled on the route keep their own sender and receivers.
   removeRoute: (routeId: string) => void;
+  addApi: (api: Omit<ApiDefinition, "id">) => string;
+  updateApi: (apiId: string, patch: Partial<Omit<ApiDefinition, "id">>) => void;
+  removeApi: (apiId: string) => void;
 
   // Sketches sit outside the project undo history entirely (see keepSketches).
   addSketch: (name: string) => string;
@@ -324,7 +329,7 @@ function forgetEntity(project: Project, entityId: string) {
   project.docLinks = project.docLinks.filter((link) => link.entityId !== entityId);
 }
 
-// A removed device or service leaves messages and routes to it without that end.
+// A removed device or service leaves messages, routes and APIs to it without that end.
 function forgetEndpoint(project: Project, deviceId: string, serviceId?: string) {
   const matches = (end: { deviceId: string; serviceId?: string } | undefined) =>
     !!end && end.deviceId === deviceId && (!serviceId || end.serviceId === serviceId);
@@ -343,6 +348,11 @@ function forgetEndpoint(project: Project, deviceId: string, serviceId?: string) 
       if (serviceId) delete route[end]!.serviceId;
       else delete route[end];
     }
+  }
+  for (const api of Object.values(project.apis)) {
+    if (!matches(api.server)) continue;
+    if (serviceId) delete api.server!.serviceId;
+    else delete api.server;
   }
 }
 
@@ -952,6 +962,12 @@ export const useProjectStore = create<ProjectState>()(
       removeMessage: (messageId) =>
         set((state) => {
           delete state.project.messages[messageId];
+          for (const api of Object.values(state.project.apis)) {
+            for (const endpoint of api.endpoints) {
+              if (endpoint.requestId === messageId) delete endpoint.requestId;
+              if (endpoint.responseId === messageId) delete endpoint.responseId;
+            }
+          }
           forgetEntity(state.project, messageId);
         }),
 
@@ -1115,6 +1131,26 @@ export const useProjectStore = create<ProjectState>()(
           delete state.project.routes[routeId];
           for (const message of Object.values(state.project.messages)) if (message.routeId === routeId) delete message.routeId;
           forgetEntity(state.project, routeId);
+        }),
+
+      addApi: (api) => {
+        const id = newId("api");
+        set((state) => {
+          state.project.apis[id] = { id, ...api };
+        });
+        return id;
+      },
+
+      updateApi: (apiId, patch) =>
+        set((state) => {
+          const api = state.project.apis[apiId];
+          if (api) Object.assign(api, patch);
+        }),
+
+      removeApi: (apiId) =>
+        set((state) => {
+          delete state.project.apis[apiId];
+          forgetEntity(state.project, apiId);
         }),
 
       addSketch: (name) => {

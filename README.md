@@ -43,9 +43,10 @@ changes, the documentation changes with it.
   Protobuf messages imported from `.proto` files, each with its sender, receivers and
   transport, and Modbus mappings: the PLC variables a controller exchanges over each
   fieldbus interface, read from the same `IoMap.iom`. Filter the combined list by type or
-  device. Connections record which device or service talks to which, over what protocol
-  and path, and which messages travel on each; Services lists the software on every
-  device in one place.
+  device. APIs record the REST, gRPC and other interfaces a service answers, with each
+  endpoint and its request and response messages. Connections record which device or
+  service talks to which, over what protocol and path, and which messages travel on each;
+  Services lists the software on every device in one place.
 - **Sketches.** A built-in whiteboard for rough ideas, with shapes that link to the
   devices they describe.
 - **Report.** A printable summary of the whole system (schematic, parts list, networks,

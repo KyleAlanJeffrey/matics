@@ -29,7 +29,7 @@ export function isOwner(project: Project, id: string) {
 
 // Whether anything that can have documents linked to it still has this id.
 export function entityExists(project: Project, id: string) {
-  const owners = [project.presets, project.buses, project.devices, project.frames, project.messages, project.ioSignals, project.netMappings, project.routes];
+  const owners = [project.presets, project.buses, project.devices, project.frames, project.messages, project.ioSignals, project.netMappings, project.routes, project.apis];
   return owners.some((collection) => !!collection[id]) || !!findService(project, id);
 }
 

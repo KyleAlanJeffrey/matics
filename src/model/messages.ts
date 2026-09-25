@@ -1,3 +1,4 @@
+import { apiClients, apiMeta } from "./apis";
 import { formatFrameRange, partyLabel } from "./frames";
 import { mappingEnds } from "./net";
 import { formatEndpoint } from "./services";
@@ -61,10 +62,10 @@ export function messagesByDevice(project: Project): DeviceMessages[] {
   return Object.keys(project.devices).flatMap((id) => byDevice.get(id) ?? []);
 }
 
-// One row of the combined communications list: a CAN frame definition, a Protobuf message
-// or a fieldbus mapping.
+// One row of the combined communications list: a CAN frame definition, a Protobuf message,
+// a fieldbus mapping or an API.
 export interface CommunicationRow {
-  kind: "can" | "protobuf" | "modbus";
+  kind: "can" | "protobuf" | "modbus" | "api";
   id: string;
   name: string;
   meta?: string;
@@ -126,5 +127,21 @@ export function communicationRows(project: Project): CommunicationRow[] {
       },
     ];
   });
-  return [...frames, ...messages, ...mappings];
+  // An API reads from its callers to the service that answers it.
+  const apis: CommunicationRow[] = Object.values(project.apis).map((api) => {
+    const clients = apiClients(project, api);
+    const server = endpointDevice(project, api.server);
+    const endpoint = formatEndpoint(endpointService(project, api.server)?.endpoint);
+    return {
+      kind: "api",
+      id: api.id,
+      name: api.name,
+      meta: apiMeta(api),
+      from: clients.length ? clients.map((id) => project.devices[id].name).join(", ") : undefined,
+      to: server ? [server.name] : [],
+      transport: [api.style, endpoint].filter(Boolean).join(" ") || undefined,
+      deviceIds: [...clients, ...(server ? [server.id] : [])],
+    };
+  });
+  return [...frames, ...messages, ...mappings, ...apis];
 }

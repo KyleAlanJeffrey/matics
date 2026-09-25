@@ -23,6 +23,7 @@ Project
   netInterfaces: Record<id, NetInterface>   fieldbus interfaces such as Modbus
   netMappings:  Record<id, NetMapping>      PLC variables mapped on an interface
   routes:       Record<id, Route>           connections: who talks to whom, and how
+  apis:         Record<id, ApiDefinition>   REST, gRPC and other interfaces a service answers
 ```
 
 ## Ports
@@ -184,6 +185,18 @@ never lists its messages itself. Status is derived (`routeStatus`): proposed, el
 defined when both ends and a protocol are set, else incomplete. Removing a route unlinks
 its messages and deletes its note and document links; removing a device or service
 clears it from route ends. A route's note and documents are keyed by its id.
+
+## APIs
+
+An `ApiDefinition` (in `Project.apis`) is a request/response interface a service answers:
+a `name`, a free-text `style` (`REST`, `gRPC`), optional `version`, `basePath` and
+`specFile` (the OpenAPI document or `.proto` file that holds the full definition), and a
+`server` end (a `MessageEndpoint`). Its `endpoints` are an ordered list, each a free-text
+`method` (`GET`, `rpc`), a `path` under the base path (or an RPC name), a description and
+optional `requestId` and `responseId` naming Protobuf messages. An API never lists its
+callers: they are the far ends of the connections to or from its service (`apiClients`).
+Removing a message clears it from endpoints; removing a device or service clears it from
+`server`. An API's note and documents are keyed by its id.
 
 ## Sketches
 
