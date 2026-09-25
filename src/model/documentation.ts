@@ -27,6 +27,12 @@ export function isOwner(project: Project, id: string) {
   return !!project.presets[id] || !!project.buses[id];
 }
 
+// Whether anything that can have documents linked to it still has this id.
+export function entityExists(project: Project, id: string) {
+  const owners = [project.presets, project.buses, project.devices, project.frames, project.messages, project.ioSignals, project.netMappings, project.routes];
+  return owners.some((collection) => !!collection[id]) || !!findService(project, id);
+}
+
 // Where a link files its document: a placed copy files under its product, and a service
 // under the product of the device it runs on.
 export function ownerKeyFor(project: Project, entityId: string): string {
