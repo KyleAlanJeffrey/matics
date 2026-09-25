@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Activity, X } from "lucide-react";
+import { Activity } from "lucide-react";
+import { CreatePane, CreatePreview } from "@/components/CreatePane";
 import { useProject, useProjectStore } from "@/store/project-store";
 import { Field } from "@/views/frames/FramesView";
 import { IO_KIND_LABELS, channelKind, modulesOf } from "@/model/io";
@@ -39,7 +40,6 @@ export function MapSignalForm({ defaultDeviceId, defaultModuleId, onCancel, onSa
   const ready = !!deviceId && !!moduleLabel && !!channel.trim() && !!name.trim();
 
   const save = () => {
-    if (!ready) return;
     const targetModule = moduleId === NEW_MODULE ? addIoModule({ deviceId, name: moduleName.trim() }) : moduleId;
     const id = addIoSignal({
       moduleId: targetModule,
@@ -57,113 +57,84 @@ export function MapSignalForm({ defaultDeviceId, defaultModuleId, onCancel, onSa
   };
 
   return (
-    <aside className="flex w-[380px] shrink-0 flex-col border-l border-slate-200 bg-white">
-      <div className="flex items-start gap-2 px-4 pt-3">
-        <h2 className="flex-1 text-[20px] font-bold text-slate-900">Map a signal</h2>
-        <button onClick={onCancel} className="rounded p-1 text-slate-500 hover:bg-slate-100" title="Cancel">
-          <X className="h-4 w-4" />
-        </button>
+    <CreatePane title="Map a signal" submitLabel="Map signal" ready={ready} onCancel={onCancel} onSubmit={save}>
+      <Field label="Controller">
+        <select
+          className="input"
+          value={deviceId}
+          onChange={(e) => {
+            setDeviceId(e.target.value);
+            setModuleId(modulesOf(project, e.target.value)[0]?.id ?? NEW_MODULE);
+          }}
+        >
+          {Object.values(project.devices).map((device) => (
+            <option key={device.id} value={device.id}>
+              {device.name}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Module">
+        <select className="input" value={moduleId} onChange={(e) => setModuleId(e.target.value)}>
+          {modules.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+              {m.description ? ` (${m.description})` : ""}
+            </option>
+          ))}
+          <option value={NEW_MODULE}>New module...</option>
+        </select>
+      </Field>
+      {moduleId === NEW_MODULE && (
+        <Field label="New module name">
+          <input className="input" autoFocus placeholder="e.g. IO-1" value={moduleName} onChange={(e) => setModuleName(e.target.value)} />
+        </Field>
+      )}
+      <Field label="Hardware channel">
+        <input className="input font-mono text-[12px]" placeholder="e.g. AnalogInput01" value={channel} onChange={(e) => setChannel(e.target.value)} />
+      </Field>
+      <Field label="Signal name">
+        <input className="input" placeholder="e.g. BatteryVoltage" value={name} onChange={(e) => setName(e.target.value)} />
+      </Field>
+      <Field label="PLC variable">
+        <input className="input font-mono text-[12px]" placeholder="Optional, e.g. gIo.Inputs.BatteryVoltage" value={variable} onChange={(e) => setVariable(e.target.value)} />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Type">
+          <select className="input" value={effectiveKind} onChange={(e) => setKind(e.target.value as IoKind)}>
+            {KINDS.map((k) => (
+              <option key={k} value={k}>
+                {IO_KIND_LABELS[k]}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Direction">
+          <DirectionSelect value={effectiveDirection} onChange={setDirection} />
+        </Field>
+        <Field label="Task class">
+          <input className="input" placeholder="Optional" value={task} onChange={(e) => setTask(e.target.value)} />
+        </Field>
+        <Field label="Physical pin">
+          <input className="input" placeholder="Not specified" value={pin} onChange={(e) => setPin(e.target.value)} />
+        </Field>
       </div>
-      <form
-        className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          save();
-        }}
-      >
-        <Field label="Controller">
-          <select
-            className="input"
-            value={deviceId}
-            onChange={(e) => {
-              setDeviceId(e.target.value);
-              setModuleId(modulesOf(project, e.target.value)[0]?.id ?? NEW_MODULE);
-            }}
-          >
-            {Object.values(project.devices).map((device) => (
+      <Field label="Field device">
+        <select className="input" value={fieldDeviceId} onChange={(e) => setFieldDeviceId(e.target.value)}>
+          <option value="">Not assigned</option>
+          {Object.values(project.devices)
+            .filter((d) => d.id !== deviceId)
+            .map((device) => (
               <option key={device.id} value={device.id}>
                 {device.name}
               </option>
             ))}
-          </select>
-        </Field>
-        <Field label="Module">
-          <select className="input" value={moduleId} onChange={(e) => setModuleId(e.target.value)}>
-            {modules.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-                {m.description ? ` (${m.description})` : ""}
-              </option>
-            ))}
-            <option value={NEW_MODULE}>New module...</option>
-          </select>
-        </Field>
-        {moduleId === NEW_MODULE && (
-          <Field label="New module name">
-            <input className="input" autoFocus placeholder="e.g. IO-1" value={moduleName} onChange={(e) => setModuleName(e.target.value)} />
-          </Field>
-        )}
-        <Field label="Hardware channel">
-          <input className="input font-mono text-[12px]" placeholder="e.g. AnalogInput01" value={channel} onChange={(e) => setChannel(e.target.value)} />
-        </Field>
-        <Field label="Signal name">
-          <input className="input" placeholder="e.g. BatteryVoltage" value={name} onChange={(e) => setName(e.target.value)} />
-        </Field>
-        <Field label="PLC variable">
-          <input className="input font-mono text-[12px]" placeholder="Optional, e.g. gIo.Inputs.BatteryVoltage" value={variable} onChange={(e) => setVariable(e.target.value)} />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Type">
-            <select className="input" value={effectiveKind} onChange={(e) => setKind(e.target.value as IoKind)}>
-              {KINDS.map((k) => (
-                <option key={k} value={k}>
-                  {IO_KIND_LABELS[k]}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Direction">
-            <DirectionSelect value={effectiveDirection} onChange={setDirection} />
-          </Field>
-          <Field label="Task class">
-            <input className="input" placeholder="Optional" value={task} onChange={(e) => setTask(e.target.value)} />
-          </Field>
-          <Field label="Physical pin">
-            <input className="input" placeholder="Not specified" value={pin} onChange={(e) => setPin(e.target.value)} />
-          </Field>
-        </div>
-        <Field label="Field device">
-          <select className="input" value={fieldDeviceId} onChange={(e) => setFieldDeviceId(e.target.value)}>
-            <option value="">Not assigned</option>
-            {Object.values(project.devices)
-              .filter((d) => d.id !== deviceId)
-              .map((device) => (
-                <option key={device.id} value={device.id}>
-                  {device.name}
-                </option>
-              ))}
-          </select>
-        </Field>
+        </select>
+      </Field>
 
-        <div className="flex items-center gap-3 rounded-md bg-slate-50 px-3 py-2">
-          <Activity className="h-4 w-4 shrink-0 text-teal-600" />
-          <span className="min-w-0">
-            <span className="block text-[11px] text-slate-500">Binding preview</span>
-            <span className="block truncate font-mono text-[12px] text-slate-800">
-              {moduleLabel || "module"}.{channel.trim() || "channel"} {"->"} {name.trim() || "signal"}
-            </span>
-          </span>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onCancel} className="rounded-md border border-slate-300 px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50">
-            Cancel
-          </button>
-          <button type="submit" disabled={!ready} className="rounded-md bg-brand px-3 py-1.5 font-semibold text-charcoal hover:bg-brand-hover disabled:opacity-50">
-            Map signal
-          </button>
-        </div>
-      </form>
-    </aside>
+      <CreatePreview icon={<Activity className="h-4 w-4 shrink-0 text-teal-600" />} label="Binding preview">
+        {moduleLabel || "module"}.{channel.trim() || "channel"} {"->"} {name.trim() || "signal"}
+      </CreatePreview>
+    </CreatePane>
   );
 }

@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { ArrowRight, FileCode2, Search, Trash2, Waypoints, X } from "lucide-react";
+import { ArrowRight, FileCode2, Plus, Search, Trash2, Waypoints, X } from "lucide-react";
 import { useProject, useProjectStore } from "@/store/project-store";
 import { useSelection } from "@/lib/selection";
+import { CreatePane, CreatePreview } from "@/components/CreatePane";
 import { DocumentLinks } from "@/components/DocumentLinks";
 import { NoteEditor } from "@/views/notes/NoteEditor";
 import { CountBadge, Field } from "@/views/frames/FramesView";
@@ -27,7 +28,7 @@ const ROUTE_COLUMNS = "grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_96px] @2xl:grid-
 const WIDE_ONLY = "hidden @2xl:block";
 
 // Who talks to whom, and how. What the data looks like stays on the message definitions.
-export function ConnectionsView() {
+export function ConnectionsView({ adding, onAdding }: { adding: boolean; onAdding: (adding: boolean) => void }) {
   const project = useProject();
   const { selectedId, select } = useSelection();
   const [deviceId, setDeviceId] = useState("");
@@ -36,14 +37,28 @@ export function ConnectionsView() {
   const all = Object.values(project.routes).sort((a, b) => a.name.localeCompare(b.name));
   const protocols = [...new Set(all.map((r) => r.protocol.trim()).filter(Boolean))].sort();
   const needle = query.trim().toLowerCase();
-  const rows = all.filter(
-    (route) =>
-      (!deviceId || routeTouches(route, deviceId)) &&
-      (!protocol || route.protocol.trim() === protocol) &&
-      (!needle || [route.name, route.protocol, route.path, endLabel(project, route.from), endLabel(project, route.to)].some((text) => text?.toLowerCase().includes(needle))),
-  );
+  const shows = (route: Route) =>
+    (!deviceId || routeTouches(route, deviceId)) &&
+    (!protocol || route.protocol.trim() === protocol) &&
+    (!needle || [route.name, route.protocol, route.path, endLabel(project, route.from), endLabel(project, route.to)].some((text) => text?.toLowerCase().includes(needle)));
+  const rows = all.filter(shows);
   const selected = selectedId ? project.routes[selectedId] : undefined;
   const filtered = !!deviceId || !!protocol || !!needle;
+  const choose = (id: string) => {
+    onAdding(false);
+    select(id);
+  };
+  const clearFilters = () => {
+    setDeviceId("");
+    setProtocol("");
+    setQuery("");
+  };
+  // Filters that would hide a new connection make way for it.
+  const created = (id: string) => {
+    const route = useProjectStore.getState().project.routes[id];
+    if (route && !shows(route)) clearFilters();
+    choose(id);
+  };
 
   return (
     <div className="flex h-full">
@@ -85,29 +100,31 @@ export function ConnectionsView() {
           {rows.length === 0 && (
             <div className="px-4 py-8 text-center text-slate-400">
               {filtered ? (
-                <button
-                  onClick={() => {
-                    setDeviceId("");
-                    setProtocol("");
-                    setQuery("");
-                  }}
-                  className="text-brand-ink hover:underline"
-                >
+                <button onClick={clearFilters} className="text-brand-ink hover:underline">
                   Clear filters
                 </button>
               ) : (
-                "No connections yet. Add one to say which device or service talks to which, and over what."
+                <div className="flex flex-col items-center gap-2">
+                  <span>No connections yet. Add one to say which device or service talks to which, and over what.</span>
+                  <button onClick={() => onAdding(true)} className="flex items-center gap-1.5 rounded-md px-2 py-1 text-brand-ink hover:bg-brand-wash">
+                    <Plus className="h-4 w-4" /> Add connection
+                  </button>
+                </div>
               )}
             </div>
           )}
           {rows.map((route) => (
-            <RouteRow key={route.id} project={project} route={route} selected={route.id === selectedId} onSelect={() => select(route.id)} />
+            <RouteRow key={route.id} project={project} route={route} selected={route.id === selectedId && !adding} onSelect={() => choose(route.id)} />
           ))}
         </div>
         <div className="mt-2 text-[12px] text-slate-500">Connections define routes; message definitions describe the data.</div>
       </div>
 
-      {selected && <RouteInspector key={selected.id} route={selected} onClose={() => select(null)} />}
+      {adding ? (
+        <AddConnectionForm defaultDeviceId={deviceId} onCancel={() => onAdding(false)} onSaved={created} />
+      ) : (
+        selected && <RouteInspector key={selected.id} route={selected} onClose={() => select(null)} />
+      )}
     </div>
   );
 }
@@ -242,6 +259,62 @@ function RouteInspector({ route, onClose }: { route: Route; onClose: () => void 
         </button>
       </div>
     </aside>
+  );
+}
+
+function AddConnectionForm({ defaultDeviceId, onCancel, onSaved }: { defaultDeviceId: string; onCancel: () => void; onSaved: (routeId: string) => void }) {
+  const project = useProject();
+  const { addRoute, updateMessage } = useProjectStore();
+  const [name, setName] = useState("");
+  const [from, setFrom] = useState<MessageEndpoint | undefined>(() => (project.devices[defaultDeviceId] ? { deviceId: defaultDeviceId } : undefined));
+  const [to, setTo] = useState<MessageEndpoint | undefined>();
+  const [protocol, setProtocol] = useState("");
+  const [path, setPath] = useState("");
+  const [messageId, setMessageId] = useState("");
+  const [proposed, setProposed] = useState(false);
+  const messages = Object.values(project.messages).sort((a, b) => a.name.localeCompare(b.name));
+
+  const save = () => {
+    const id = addRoute({ name: name.trim(), from, to, protocol: protocol.trim(), path: path.trim() || undefined, proposed: proposed || undefined });
+    if (messageId) updateMessage(messageId, { routeId: id });
+    onSaved(id);
+  };
+
+  return (
+    <CreatePane title="Add connection" submitLabel="Create connection" ready={!!name.trim()} onCancel={onCancel} onSubmit={save}>
+      <Field label="Name">
+        <input className="input" autoFocus placeholder="e.g. Telemetry uplink" value={name} onChange={(e) => setName(e.target.value)} />
+      </Field>
+      <EndField project={project} label="Source" value={from} onChange={setFrom} />
+      <EndField project={project} label="Destination" value={to} onChange={setTo} />
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Protocol">
+          <input className="input" placeholder="MQTT, HTTP, WebSocket..." value={protocol} onChange={(e) => setProtocol(e.target.value)} />
+        </Field>
+        <Field label="Path or topic">
+          <input className="input font-mono text-[12px]" placeholder="Not specified" value={path} onChange={(e) => setPath(e.target.value)} />
+        </Field>
+      </div>
+      <Field label="Message definition">
+        <select className="input" value={messageId} onChange={(e) => setMessageId(e.target.value)}>
+          <option value="">Optional, link one later</option>
+          {messages.map((message) => (
+            <option key={message.id} value={message.id}>
+              {message.name}
+              {message.routeId && project.routes[message.routeId] ? ` (now on ${project.routes[message.routeId].name})` : ""}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <label className="flex items-center gap-2 text-slate-700">
+        <input type="checkbox" checked={proposed} onChange={(e) => setProposed(e.target.checked)} />
+        Proposed: planned, not built yet
+      </label>
+      <CreatePreview icon={<Waypoints className="h-4 w-4 shrink-0 text-slate-500" />} label="Route preview">
+        {endLabel(project, from) ?? "source"} {"->"} {endLabel(project, to) ?? "destination"}
+        {path.trim() ? ` ${path.trim()}` : ""}
+      </CreatePreview>
+    </CreatePane>
   );
 }
 

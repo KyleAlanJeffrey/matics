@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
-import { ArrowLeft, ArrowRight, Copy, Info, Plus, Search, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Copy, Database, Info, Plus, Search, Trash2, X } from "lucide-react";
 import { useProject, useProjectStore } from "@/store/project-store";
 import { useSelection } from "@/lib/selection";
+import { CreatePane, CreatePreview } from "@/components/CreatePane";
 import { DocumentLinks } from "@/components/DocumentLinks";
 import { NoteEditor } from "@/views/notes/NoteEditor";
 import { CountBadge, Field } from "@/views/frames/FramesView";
 import { ControllerIcon, NotSpecified } from "@/views/io/io-ui";
 import { DirectionSelect } from "@/views/io/SignalInspector";
 import { ioControllers } from "@/model/io";
-import { interfacesOf, mappingsOf, netControllers } from "@/model/net";
+import { interfaceLabel, interfacesOf, mappingsOf, netControllers } from "@/model/net";
 import type { IoDirection, NetInterface, NetMapping, Project } from "@/model/types";
 
 // The interface in view: the selected mapping's, else the one in the URL, else the first.
@@ -22,13 +23,20 @@ export function resolveInterface(project: Project, interfaceParam: string | null
 
 // Symbolic data a controller exchanges over a fieldbus interface. Physical channels are on
 // the I/O page; register addresses and peers stay unspecified until someone records them.
-export function ModbusView() {
+export function ModbusView({ adding, onAdding }: { adding: boolean; onAdding: (adding: boolean) => void }) {
   const project = useProject();
   const [params, setParams] = useSearchParams();
   const { selectedId, select } = useSelection();
   const [addingInterface, setAddingInterface] = useState(false);
   const current = resolveInterface(project, params.get("interface"), selectedId);
   const selected = selectedId ? project.netMappings[selectedId] : undefined;
+  // Bumped by each new mapping. It remounts the table, which clears its filters, so the
+  // new mapping is listed.
+  const [created, setCreated] = useState(0);
+  const choose = (id: string) => {
+    onAdding(false);
+    select(id);
+  };
 
   const pick = (interfaceId: string) =>
     setParams(
@@ -54,7 +62,7 @@ export function ModbusView() {
         }}
       />
       {current ? (
-        <InterfacePanel key={current.id} project={project} netInterface={current} selectedId={selectedId} onSelect={select} />
+        <InterfacePanel key={`${current.id}:${created}`} project={project} netInterface={current} selectedId={adding ? null : selectedId} onSelect={choose} onAdd={() => onAdding(true)} />
       ) : (
         <div className="flex flex-1 items-center justify-center bg-slate-50/60 p-6">
           <div className="max-w-md rounded-lg border border-dashed border-slate-300 bg-white px-6 py-8 text-center text-slate-600">
@@ -66,8 +74,19 @@ export function ModbusView() {
           </div>
         </div>
       )}
-      {/* Closing keeps the mapping's interface in view: it may not be the one in the URL. */}
-      {selected && <MappingInspector key={selected.id} mapping={selected} onClose={() => pick(selected.interfaceId)} />}
+      {adding ? (
+        <AddMappingForm
+          defaultInterfaceId={current?.id}
+          onCancel={() => onAdding(false)}
+          onSaved={(id) => {
+            setCreated((n) => n + 1);
+            choose(id);
+          }}
+        />
+      ) : (
+        // Closing keeps the mapping's interface in view: it may not be the one in the URL.
+        selected && <MappingInspector key={selected.id} mapping={selected} onClose={() => pick(selected.interfaceId)} />
+      )}
     </div>
   );
 }
@@ -192,7 +211,7 @@ function AddInterfaceForm({ defaultDeviceId, onCancel, onSaved }: { defaultDevic
 const MAPPING_COLUMNS = "grid-cols-[minmax(0,1.2fr)_76px_minmax(0,1fr)] @2xl:grid-cols-[minmax(0,1.2fr)_76px_minmax(0,1.3fr)_minmax(0,1fr)_80px]";
 const WIDE_ONLY = "hidden @2xl:block";
 
-function InterfacePanel({ project, netInterface, selectedId, onSelect }: { project: Project; netInterface: NetInterface; selectedId: string | null; onSelect: (id: string) => void }) {
+function InterfacePanel({ project, netInterface, selectedId, onSelect, onAdd }: { project: Project; netInterface: NetInterface; selectedId: string | null; onSelect: (id: string) => void; onAdd: () => void }) {
   const { removeNetInterface } = useProjectStore();
   const [query, setQuery] = useState("");
   const [direction, setDirection] = useState<IoDirection | "all">("all");
@@ -245,7 +264,12 @@ function InterfacePanel({ project, netInterface, selectedId, onSelect }: { proje
         {rows.length === 0 && (
           <div className="px-4 py-8 text-center text-slate-400">
             {all.length === 0 ? (
-              "No mappings on this interface yet."
+              <div className="flex flex-col items-center gap-2">
+                <span>No mappings on this interface yet.</span>
+                <button onClick={onAdd} className="flex items-center gap-1.5 rounded-md px-2 py-1 text-brand-ink hover:bg-brand-wash">
+                  <Plus className="h-4 w-4" /> Add mapping
+                </button>
+              </div>
             ) : (
               <button
                 onClick={() => {
@@ -326,6 +350,72 @@ function InterfaceCard({ project, netInterface }: { project: Project; netInterfa
         <input className="input" placeholder="Not specified" value={netInterface.unitId ?? ""} onChange={(e) => update({ unitId: e.target.value || undefined })} />
       </Field>
     </div>
+  );
+}
+
+function AddMappingForm({ defaultInterfaceId, onCancel, onSaved }: { defaultInterfaceId?: string; onCancel: () => void; onSaved: (mappingId: string) => void }) {
+  const project = useProject();
+  const addNetMapping = useProjectStore((s) => s.addNetMapping);
+  const interfaces = netControllers(project).flatMap((id) => interfacesOf(project, id));
+  const [interfaceId, setInterfaceId] = useState(() => defaultInterfaceId ?? interfaces[0]?.id ?? "");
+  const [name, setName] = useState("");
+  const [variable, setVariable] = useState("");
+  const [symbol, setSymbol] = useState("");
+  const [direction, setDirection] = useState<IoDirection>("output");
+  const [task, setTask] = useState("");
+  const [register, setRegister] = useState("");
+  const netInterface = project.netInterfaces[interfaceId];
+  const value = variable.trim() || name.trim() || "value";
+  const wire = `${netInterface?.name || "interface"}.${symbol.trim() || "symbol"}`;
+
+  const save = () =>
+    onSaved(
+      addNetMapping({
+        interfaceId,
+        name: name.trim(),
+        symbol: symbol.trim(),
+        direction,
+        variable: variable.trim() || undefined,
+        task: task.trim() || undefined,
+        register: register.trim() || undefined,
+      }),
+    );
+
+  return (
+    <CreatePane title="Add mapping" submitLabel="Create mapping" ready={!!netInterface && !!name.trim()} onCancel={onCancel} onSubmit={save}>
+      <Field label="Interface">
+        <select className="input" value={interfaceId} onChange={(e) => setInterfaceId(e.target.value)}>
+          {interfaces.map((i) => (
+            <option key={i.id} value={i.id}>
+              {interfaceLabel(project, i)}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Name">
+        <input className="input" autoFocus placeholder="e.g. Charge enable" value={name} onChange={(e) => setName(e.target.value)} />
+      </Field>
+      <Field label="PLC variable">
+        <input className="input font-mono text-[12px]" placeholder="Optional, e.g. gDock.Outputs.ChargeEnable" value={variable} onChange={(e) => setVariable(e.target.value)} />
+      </Field>
+      <Field label="Interface symbol">
+        <input className="input font-mono text-[12px]" placeholder="e.g. charge_enable" value={symbol} onChange={(e) => setSymbol(e.target.value)} />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Direction">
+          <DirectionSelect value={direction} onChange={setDirection} />
+        </Field>
+        <Field label="Task class">
+          <input className="input" placeholder="Optional" value={task} onChange={(e) => setTask(e.target.value)} />
+        </Field>
+        <Field label="Register address">
+          <input className="input" placeholder="Not specified" value={register} onChange={(e) => setRegister(e.target.value)} />
+        </Field>
+      </div>
+      <CreatePreview icon={<Database className="h-4 w-4 shrink-0 text-emerald-600" />} label="Mapping preview">
+        {direction === "output" ? `${value} -> ${wire}` : `${wire} -> ${value}`}
+      </CreatePreview>
+    </CreatePane>
   );
 }
 

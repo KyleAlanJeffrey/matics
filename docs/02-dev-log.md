@@ -175,7 +175,7 @@ the stack decision in `00-tech-stack.md`.
   peer, transport and unit ID are edited in a card above its mappings; a mapping's
   inspector shows them read-only beside its own binding and register. A selected mapping
   (`?selected=`) decides the interface in view, so rows opened from All land on the right
-  one. "Add mapping" adds a blank mapping to the interface in view and selects it.
+  one.
 - Connections (`src/model/routes.ts`) lists routes with a device filter, a protocol
   filter and a derived status. The inspector edits both ends with the same device and
   service pickers as a Protobuf message, links messages to the route, and links to the
@@ -184,6 +184,13 @@ the stack decision in `00-tech-stack.md`.
   records the device inspector and documentation pages edit, and it uses the same
   `ServiceForm`, so port validation is shared. A service stays on its device; moving one
   between devices is not supported.
+- Every tab's Add opens a short create form where the inspector sits
+  (`components/CreatePane.tsx`), like "Map signal" on I/O. Nothing is written until the
+  form is submitted, so Cancel returns to whatever was selected, and the new record is
+  selected after. Filters that would hide the new record are cleared (on Modbus, the
+  table's filters always reset), so it is always in the list. A connection created with a message links it in the same undo step,
+  because edits inside the undo coalescing window merge. An empty table offers the same
+  create action; a filtered one that shows nothing offers Clear filters.
 
 ## Sketches
 

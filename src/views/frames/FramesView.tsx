@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpFromLine, ChevronDown, ChevronRight, FileText, Plus, Trash2, X } from "lucide-react";
+import { ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpFromLine, ChevronDown, ChevronRight, FileText, Network, Plus, Trash2, X } from "lucide-react";
 import { useProject, useProjectDir, useProjectStore } from "@/store/project-store";
 import { useSelection } from "@/lib/selection";
 import { assetSrc } from "@/lib/assets";
@@ -7,6 +7,7 @@ import { busColor, type CanFrame, type Project } from "@/model/types";
 import { formatCanId, formatFrameRange, frameFlows, frameIdCount, parseCanId, partyLabel, partyOptions, partyPresetId, partyTotals, totalFrameIds, type PartyTotals } from "@/model/frames";
 import { DbcImportButton } from "./DbcImport";
 import { Tag } from "@/components/Badges";
+import { CreatePane, CreatePreview } from "@/components/CreatePane";
 
 const DOT = "\u00b7";
 const UNASSIGNED = "unassigned";
@@ -17,10 +18,9 @@ type Mode = "definitions" | "by-device";
 // expected allocation, not live traffic: nothing here is a message rate or a count of
 // transmissions.
 // Embedded in Communications, whose header carries the title and the add button.
-export function FramesView({ embedded = false }: { embedded?: boolean }) {
+export function FramesView({ adding, onAdding }: { adding: boolean; onAdding: (adding: boolean) => void }) {
   const project = useProject();
   const { selectedId, select } = useSelection();
-  const { addFrame } = useProjectStore();
   const [mode, setMode] = useState<Mode>("definitions");
   const [query, setQuery] = useState("");
   const [partyFilter, setPartyFilter] = useState<string>("");
@@ -32,22 +32,32 @@ export function FramesView({ embedded = false }: { embedded?: boolean }) {
   const unassigned = frames.filter((f) => knownBuses(f).length === 0).length;
   const selectedFrame = selectedId ? project.frames[selectedId] : undefined;
 
-  const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    const needleId = parseCanId(query);
-    return frames.filter((frame) => {
-      if (partyFilter && frame.senderId !== partyFilter && !frame.receiverIds.includes(partyFilter)) return false;
-      if (busFilter === UNASSIGNED ? knownBuses(frame).length > 0 : busFilter && !frame.busIds.includes(busFilter)) return false;
-      if (!needle) return true;
-      if (frame.name.toLowerCase().includes(needle)) return true;
-      if (needleId !== undefined && needleId >= frame.startId && needleId <= frame.endId) return true;
-      return formatFrameRange(frame).toLowerCase().includes(needle);
-    });
-  }, [frames, query, partyFilter, busFilter, project.buses]);
+  const needle = query.trim().toLowerCase();
+  const needleId = parseCanId(query);
+  const shows = (frame: CanFrame) => {
+    if (partyFilter && frame.senderId !== partyFilter && !frame.receiverIds.includes(partyFilter)) return false;
+    if (busFilter === UNASSIGNED ? knownBuses(frame).length > 0 : busFilter && !frame.busIds.includes(busFilter)) return false;
+    if (!needle) return true;
+    if (frame.name.toLowerCase().includes(needle)) return true;
+    if (needleId !== undefined && needleId >= frame.startId && needleId <= frame.endId) return true;
+    return formatFrameRange(frame).toLowerCase().includes(needle);
+  };
+  const visible = frames.filter(shows);
 
-  const createFrame = () => {
-    const id = addFrame({ group: frames[frames.length - 1]?.group });
+  const choose = (id: string) => {
+    onAdding(false);
     select(id);
+  };
+  const clearFilters = () => {
+    setQuery("");
+    setPartyFilter("");
+    setBusFilter("");
+  };
+  // Filters that would hide a new frame make way for it.
+  const created = (id: string) => {
+    const frame = useProjectStore.getState().project.frames[id];
+    if (frame && !shows(frame)) clearFilters();
+    choose(id);
   };
 
   return (
@@ -119,35 +129,17 @@ export function FramesView({ embedded = false }: { embedded?: boolean }) {
         </SidebarSection>
 
         <div className="mt-auto p-3">
-          <button onClick={createFrame} className="flex w-full items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-brand-ink hover:bg-slate-50">
+          <button onClick={() => onAdding(true)} className="flex w-full items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-brand-ink hover:bg-slate-50">
             <Plus className="h-4 w-4" /> Frame definition
           </button>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col overflow-y-auto bg-slate-50/60">
-        {!embedded && (
-        <div className="flex items-start gap-4 px-6 pt-5">
-          <div className="min-w-0 flex-1">
-            <div className="font-mono text-[12px] font-medium uppercase tracking-[0.12em] text-slate-500">Communication schema</div>
-            <h1 className="text-[30px] font-bold leading-tight text-slate-900">CAN frames</h1>
-            <div className="mt-1 text-slate-500">Define who sends each frame and who consumes it.</div>
-            <div className="mt-2 text-slate-600">
-              {frames.length} definition{frames.length === 1 ? "" : "s"} {DOT} {totalFrameIds(frames)} CAN IDs
-            </div>
-          </div>
-          <button onClick={createFrame} className="flex items-center gap-1 rounded-lg bg-brand px-3 py-2 font-medium text-charcoal hover:bg-brand-hover">
-            <Plus className="h-4 w-4" /> Add frame
-          </button>
-        </div>
-        )}
-
         <div className="flex flex-wrap items-center justify-end gap-2 px-6 pt-4">
-          {embedded && (
-            <div className="mr-auto text-slate-600">
-              {frames.length} definition{frames.length === 1 ? "" : "s"} {DOT} {totalFrameIds(frames)} CAN IDs
-            </div>
-          )}
+          <div className="mr-auto text-slate-600">
+            {frames.length} definition{frames.length === 1 ? "" : "s"} {DOT} {totalFrameIds(frames)} CAN IDs
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <select className="input" style={{ width: "auto" }} value={partyFilter} onChange={(e) => setPartyFilter(e.target.value)}>
               <option value="">All devices</option>
@@ -178,9 +170,28 @@ export function FramesView({ embedded = false }: { embedded?: boolean }) {
 
         <div className="flex flex-col gap-4 p-6">
           {mode === "definitions" ? (
-            <FrameTable project={project} frames={visible} selectedId={selectedId} onSelect={select} />
+            <FrameTable
+              project={project}
+              frames={visible}
+              selectedId={adding ? null : selectedId}
+              onSelect={choose}
+              empty={
+                frames.length === 0 ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <span>No frames yet. Add a frame definition to start allocating identifiers.</span>
+                    <button onClick={() => onAdding(true)} className="flex items-center gap-1.5 rounded-md px-2 py-1 text-brand-ink hover:bg-brand-wash">
+                      <Plus className="h-4 w-4" /> Add frame
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={clearFilters} className="text-brand-ink hover:underline">
+                    Clear filters
+                  </button>
+                )
+              }
+            />
           ) : (
-            <ByDevice project={project} totals={totals.filter((t) => !partyFilter || t.partyId === partyFilter)} selectedId={selectedId} onSelect={select} />
+            <ByDevice project={project} totals={totals.filter((t) => !partyFilter || t.partyId === partyFilter)} selectedId={adding ? null : selectedId} onSelect={choose} />
           )}
           <FlowPreview project={project} />
           <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-slate-500">
@@ -190,12 +201,22 @@ export function FramesView({ embedded = false }: { embedded?: boolean }) {
         </div>
       </div>
 
-      {selectedFrame && <FrameEditor frame={selectedFrame} onClose={() => select(null)} />}
+      {adding ? (
+        <AddFrameForm
+          defaultPartyId={partyFilter}
+          defaultBusId={busFilter}
+          defaultGroup={frames[frames.length - 1]?.group}
+          onCancel={() => onAdding(false)}
+          onSaved={created}
+        />
+      ) : (
+        selectedFrame && <FrameEditor frame={selectedFrame} onClose={() => select(null)} />
+      )}
     </div>
   );
 }
 
-function FrameTable({ project, frames, selectedId, onSelect }: { project: Project; frames: CanFrame[]; selectedId: string | null; onSelect: (id: string) => void }) {
+function FrameTable({ project, frames, selectedId, onSelect, empty }: { project: Project; frames: CanFrame[]; selectedId: string | null; onSelect: (id: string) => void; empty: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const groups = useMemo(() => {
     const order: string[] = [];
@@ -237,7 +258,7 @@ function FrameTable({ project, frames, selectedId, onSelect }: { project: Projec
           {frames.length === 0 && (
             <tr>
               <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
-                No frames match. Add a frame definition to start allocating identifiers.
+                {empty}
               </td>
             </tr>
           )}
@@ -585,6 +606,117 @@ function FrameEditor({ frame, onClose }: { frame: CanFrame; onClose: () => void 
         </button>
       </div>
     </aside>
+  );
+}
+
+function AddFrameForm({
+  defaultPartyId,
+  defaultBusId,
+  defaultGroup,
+  onCancel,
+  onSaved,
+}: {
+  defaultPartyId: string;
+  defaultBusId: string;
+  defaultGroup?: string;
+  onCancel: () => void;
+  onSaved: (frameId: string) => void;
+}) {
+  const project = useProject();
+  const addFrame = useProjectStore((s) => s.addFrame);
+  const parties = partyOptions(project);
+  const canBuses = Object.values(project.buses).filter((b) => b.kind === "can");
+  const [name, setName] = useState("");
+  const [rangeMode, setRangeMode] = useState(false);
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [senderId, setSenderId] = useState(() => (parties.some((p) => p.id === defaultPartyId) ? defaultPartyId : ""));
+  const [receiverId, setReceiverId] = useState("");
+  const [busId, setBusId] = useState(() => (canBuses.some((b) => b.id === defaultBusId) ? defaultBusId : ""));
+  const startId = parseCanId(start);
+  const endId = rangeMode ? parseCanId(end) : startId;
+  const range = startId !== undefined && endId !== undefined && endId >= startId ? { startId, endId } : undefined;
+  const count = range ? frameIdCount(range) : 0;
+
+  const save = () => {
+    if (!range) return;
+    onSaved(
+      addFrame({
+        name: name.trim(),
+        ...range,
+        senderId,
+        receiverIds: receiverId ? [receiverId] : [],
+        busIds: busId ? [busId] : [],
+        group: defaultGroup,
+      }),
+    );
+  };
+
+  return (
+    <CreatePane title="Add CAN frame" submitLabel="Create frame" ready={!!name.trim() && !!range && !!senderId} onCancel={onCancel} onSubmit={save}>
+      <Field label="Name">
+        <input className="input" autoFocus placeholder="e.g. DriveCommand" value={name} onChange={(e) => setName(e.target.value)} />
+      </Field>
+      <Field label="Identifier mode">
+        <select className="input" value={rangeMode ? "range" : "single"} onChange={(e) => setRangeMode(e.target.value === "range")}>
+          <option value="single">Single ID</option>
+          <option value="range">Range</option>
+        </select>
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label={rangeMode ? "Start ID" : "CAN ID"}>
+          <input className={`input font-mono ${start.trim() && startId === undefined ? "border-red-300" : ""}`} placeholder="e.g. 0x100" value={start} onChange={(e) => setStart(e.target.value)} />
+        </Field>
+        {rangeMode && (
+          <Field label="End ID">
+            <input className={`input font-mono ${end.trim() && !range ? "border-red-300" : ""}`} placeholder="e.g. 0x102" value={end} onChange={(e) => setEnd(e.target.value)} />
+          </Field>
+        )}
+      </div>
+      {range && (
+        <div className="-mt-1 text-[12px] text-slate-500">
+          {count} identifier{count === 1 ? "" : "s"} {rangeMode && `${DOT} inclusive`}
+        </div>
+      )}
+      <Field label="Sender" icon={<ArrowUpFromLine className="h-3.5 w-3.5 text-brand-ink" />}>
+        <select className="input" value={senderId} onChange={(e) => setSenderId(e.target.value)}>
+          {!senderId && <option value="">Choose a sender</option>}
+          {parties.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Receiver" icon={<ArrowDownToLine className="h-3.5 w-3.5 text-teal-600" />}>
+        <select className="input" value={receiverId} onChange={(e) => setReceiverId(e.target.value)}>
+          <option value="">Not set</option>
+          {parties
+            .filter((p) => p.id !== senderId)
+            .map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+        </select>
+        <span className="text-[11px] text-slate-400">Add more receivers once the frame exists.</span>
+      </Field>
+      <Field label="Bus">
+        <select className="input" value={busId} onChange={(e) => setBusId(e.target.value)}>
+          <option value="">Unassigned</option>
+          {canBuses.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.tag ? `${b.tag} ${b.name}` : b.name}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <CreatePreview icon={<Network className="h-4 w-4 shrink-0 text-[#713bc4]" />} label="Frame preview">
+        {range ? formatFrameRange(range) : "CAN ID"}
+        {senderId ? `, from ${partyLabel(project, senderId)}` : ""}
+        {receiverId ? ` to ${partyLabel(project, receiverId)}` : ""}
+      </CreatePreview>
+    </CreatePane>
   );
 }
 
